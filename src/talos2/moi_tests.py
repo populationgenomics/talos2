@@ -1,0 +1,1431 @@
+"""
+A number of classes, each representing one Mode of Inheritance
+One class (MoiRunner) to run all the appropriate MOIs on a variant
+"""
+
+# mypy: ignore-errors
+# ruff: noqa: ERA001
+from abc import abstractmethod
+from dataclasses import dataclass
+from itertools import chain
+from typing import ClassVar
+
+from mendelbrot.pedigree_parser import PedigreeParser
+
+from talos2.config import config_retrieve
+from talos2.exclusion_log import get_exclusion_logger
+from talos2.models import VARIANT_MODELS, ReportVariant, ShortTandemRepeat, SmallVariant, StructuralVariant
+from talos2.static_values import get_granular_date
+from talos2.utils import X_CHROMOSOME, CompHetDict
+
+HEMI_CHROMS = {'chrX, chrY'}
+SV_HEMI = {'male_n_hemialt'}
+SV_HOMS = {'male_n_homalt', 'female_n_homalt'}
+
+
+def get_str_var_data(var: VARIANT_MODELS, sample_id: str) -> VARIANT_MODELS:
+    """For STRs, return a shallow copy with a sample-scoped info dict. Other variant types pass through unchanged."""
+    if isinstance(var, ShortTandemRepeat):
+        copy = var.model_copy(deep=False)
+        copy.info = {
+            **var.info,
+            'sample_repeats': var.sample_repeats[sample_id],
+            'sample_repeat_details': var.sample_repeat_details[sample_id],
+        }
+        return copy
+    return var
+
+
+@dataclass
+class GlobalFilter:
+    """
+    A Filter class, used to apply to any non-ClinVar Pathogenic Variants
+    This pulls in a number of thresholds from the config file, and contains a 'too_common' method
+    A variant run through this method will return true based on the thresholds if it's 'too_common'
+    """
+
+    # minimum variant AC to run callset frequency filters
+    ac_threshold: ClassVar[int] = config_retrieve(['ValidateMOI', 'min_callset_ac_to_filter'])
+    small_af: ClassVar[float] = config_retrieve(['ValidateMOI', 'callset_max_af'])
+    sv_af: ClassVar[float] = config_retrieve(['ValidateMOI', 'callset_sv_max_af'])
+
+    # a lookup of the attribute name vs. the corresponding configurable filter to be used on small variants
+    small_dict: ClassVar[dict[str, float | int]] = {
+        'gnomad_af': config_retrieve(['ValidateMOI', 'gnomad_max_af']),
+        'gnomad_homalt': config_retrieve(['ValidateMOI', 'gnomad_max_homozygotes']),
+    }
+
+    # only to be applied on chrX/Y
+    small_gnomad_hemi: ClassVar[int] = config_retrieve(['ValidateMOI', 'gnomad_max_hemizygotes'])
+
+    # filters specific to SVs
+    sv_dict: ClassVar[dict[str, float]] = {
+        'gnomad_v2.1_sv_AF': config_retrieve(['ValidateMOI', 'gnomad_sv_max_af']),
+    }
+
+    def too_common(  # noqa: PLR0911
+        self, variant: SmallVariant | ShortTandemRepeat | StructuralVariant, applied_moi: str | None = None
+    ) -> bool:
+        """
+        Check if a variant is too common in the population
+
+        Args:
+            variant (SmallVariant | ShortTandemRepeat | StructuralVariant): the variant to check
+            applied_moi (str | None): MOI under which this filter is being applied (for exclusion logging only)
+
+        Returns:
+            bool: True if the variant is too common
+        """
+
+        ex_logger = get_exclusion_logger()
+        gene = variant.info.get('gene_id') if isinstance(variant.info.get('gene_id'), str) else None
+
+        # check against each small-variant filter
+        if isinstance(variant, SmallVariant):
+            for key, threshold in self.small_dict.items():
+                if key in variant.info and variant.info[key] > threshold:
+                    ex_logger.record(
+                        variant=variant,
+                        gene=gene,
+                        sample=None,
+                        applied_moi=applied_moi,
+                        stage='frequency_filter',
+                        reason=f'{key}_too_high',
+                        details={'value': variant.info[key], 'threshold': threshold, 'filter': 'global'},
+                    )
+                    return True
+
+            # if there are sufficient instances, check for frequency in the callset
+            if variant.info['ac'] > self.ac_threshold and variant.info['af'] > self.small_af:
+                ex_logger.record(
+                    variant=variant,
+                    gene=gene,
+                    sample=None,
+                    applied_moi=applied_moi,
+                    stage='frequency_filter',
+                    reason='callset_af_too_high',
+                    details={
+                        'ac': variant.info['ac'],
+                        'af': variant.info['af'],
+                        'ac_threshold': self.ac_threshold,
+                        'af_threshold': self.small_af,
+                        'filter': 'global',
+                    },
+                )
+                return True
+
+            # on sex chroms, apply hemi-count filter
+            if variant.coordinates.chrom in HEMI_CHROMS:
+                hemi_count = variant.info.get('gnomad_ac_xy', 0)
+                if hemi_count > self.small_gnomad_hemi:
+                    ex_logger.record(
+                        variant=variant,
+                        gene=gene,
+                        sample=None,
+                        applied_moi=applied_moi,
+                        stage='frequency_filter',
+                        reason='gnomad_ac_xy_too_high',
+                        details={'value': hemi_count, 'threshold': self.small_gnomad_hemi, 'filter': 'global'},
+                    )
+                    return True
+                return False
+
+        # check against the SV filters
+        elif isinstance(variant, StructuralVariant):
+            for key, threshold in self.sv_dict.items():
+                if key in variant.info and variant.info[key] > threshold:
+                    ex_logger.record(
+                        variant=variant,
+                        gene=gene,
+                        sample=None,
+                        applied_moi=applied_moi,
+                        stage='frequency_filter',
+                        reason=f'{key}_too_high',
+                        details={'value': variant.info[key], 'threshold': threshold, 'filter': 'global_sv'},
+                    )
+                    return True
+
+            # if there are sufficient instances, check for frequency in the callset
+            if variant.info['ac'] > self.ac_threshold and variant.info['af'] > self.sv_af:
+                ex_logger.record(
+                    variant=variant,
+                    gene=gene,
+                    sample=None,
+                    applied_moi=applied_moi,
+                    stage='frequency_filter',
+                    reason='callset_sv_af_too_high',
+                    details={
+                        'ac': variant.info['ac'],
+                        'af': variant.info['af'],
+                        'ac_threshold': self.ac_threshold,
+                        'af_threshold': self.sv_af,
+                        'filter': 'global_sv',
+                    },
+                )
+                return True
+
+        elif isinstance(variant, ShortTandemRepeat):
+            return False
+
+        else:
+            raise ValueError('Variant type not recognised')
+
+        return False
+
+
+@dataclass
+class DominantFilter:
+    """
+    Similar to the GlobalFilter, but with stricter thresholds
+    This is designed to run on variants being considered for Dominant inheritance
+    """
+
+    # minimum variant AC to run callset frequency filters
+    ac_min: ClassVar[int] = config_retrieve(['ValidateMOI', 'min_callset_ac_to_filter'])
+    ac_threshold: ClassVar[int] = config_retrieve(['ValidateMOI', 'dominant_callset_max_ac'])
+    small_af: ClassVar[float] = config_retrieve(['ValidateMOI', 'dominant_callset_max_af'])
+    sv_af: ClassVar[float] = config_retrieve(['ValidateMOI', 'dominant_callset_sv_max_af'])
+
+    # a lookup of the attribute name vs. the corresponding configurable filter
+    small_dict: ClassVar[dict[str, float | int]] = {
+        'gnomad_af': config_retrieve(['ValidateMOI', 'dominant_gnomad_max_af']),
+        'gnomad_ac': config_retrieve(['ValidateMOI', 'dominant_gnomad_max_ac']),
+        'gnomad_homalt': config_retrieve(['ValidateMOI', 'dominant_gnomad_max_homozygotes']),
+    }
+
+    # specific to SVs
+    sv_dict: ClassVar[dict[str, float]] = {
+        'gnomad_v2.1_sv_AF': config_retrieve(['ValidateMOI', 'dominant_gnomad_sv_max_af']),
+    }
+
+    def too_common(
+        self, variant: SmallVariant | ShortTandemRepeat | StructuralVariant, applied_moi: str | None = None
+    ) -> bool:
+        """
+        Check if a variant is too common in the population
+
+        Args:
+            variant (SmallVariant | ShortTandemRepeat | StructuralVariant): the variant to check
+            applied_moi (str | None): MOI under which this filter is being applied (for exclusion logging only)
+
+        Returns:
+            bool: True if the variant is too common
+        """
+
+        ex_logger = get_exclusion_logger()
+        gene = variant.info.get('gene_id') if isinstance(variant.info.get('gene_id'), str) else None
+
+        # check against each small-variant filter
+        if isinstance(variant, SmallVariant):
+            for key, threshold in self.small_dict.items():
+                if key in variant.info and variant.info[key] > threshold:
+                    ex_logger.record(
+                        variant=variant,
+                        gene=gene,
+                        sample=None,
+                        applied_moi=applied_moi,
+                        stage='frequency_filter',
+                        reason=f'{key}_too_high',
+                        details={'value': variant.info[key], 'threshold': threshold, 'filter': 'dominant'},
+                    )
+                    return True
+            if variant.info['ac'] > self.ac_threshold and variant.info['af'] > self.small_af:
+                ex_logger.record(
+                    variant=variant,
+                    gene=gene,
+                    sample=None,
+                    applied_moi=applied_moi,
+                    stage='frequency_filter',
+                    reason='callset_af_too_high',
+                    details={
+                        'ac': variant.info['ac'],
+                        'af': variant.info['af'],
+                        'ac_threshold': self.ac_threshold,
+                        'af_threshold': self.small_af,
+                        'filter': 'dominant',
+                    },
+                )
+                return True
+
+        elif isinstance(variant, StructuralVariant):
+            for key, threshold in self.sv_dict.items():
+                if key in variant.info and variant.info[key] > threshold:
+                    ex_logger.record(
+                        variant=variant,
+                        gene=gene,
+                        sample=None,
+                        applied_moi=applied_moi,
+                        stage='frequency_filter',
+                        reason=f'{key}_too_high',
+                        details={'value': variant.info[key], 'threshold': threshold, 'filter': 'dominant_sv'},
+                    )
+                    return True
+            if variant.info['ac'] > self.ac_min and (
+                (variant.info['af'] > self.sv_af) or (variant.info['ac'] > self.ac_threshold)
+            ):
+                ex_logger.record(
+                    variant=variant,
+                    gene=gene,
+                    sample=None,
+                    applied_moi=applied_moi,
+                    stage='frequency_filter',
+                    reason='callset_sv_freq_too_high',
+                    details={
+                        'ac': variant.info['ac'],
+                        'af': variant.info['af'],
+                        'ac_min': self.ac_min,
+                        'ac_threshold': self.ac_threshold,
+                        'af_threshold': self.sv_af,
+                        'filter': 'dominant_sv',
+                    },
+                )
+                return True
+
+        elif isinstance(variant, ShortTandemRepeat):
+            return False
+
+        else:
+            raise ValueError('Variant type not recognised')
+
+        return False
+
+
+@dataclass
+class ClinVarFilter:
+    """
+    This will apply more lenient filters to ClinVar Pathogenic variants
+    """
+
+    # minimum variant AC to run callset frequency filters
+    ac_threshold: ClassVar[int] = config_retrieve(['ValidateMOI', 'min_callset_ac_to_filter'])
+
+    # a lookup of the attribute name vs. the corresponding configurable filter
+    small_dict: ClassVar[dict[str, float]] = {
+        'gnomad_af': config_retrieve(['ValidateMOI', 'clinvar_gnomad_max_af']),
+    }
+    small_af: ClassVar[float] = config_retrieve(['ValidateMOI', 'clinvar_callset_max_af'])
+
+    def too_common(self, variant: SmallVariant, applied_moi: str | None = None) -> bool:
+        """
+        Check if a variant is too common in the population
+
+        Args:
+            variant (SmallVariant): the variant to check
+            applied_moi (str | None): MOI under which this filter is being applied (for exclusion logging only)
+
+        Returns:
+            bool: True if the variant is too common
+        """
+        ex_logger = get_exclusion_logger()
+        gene = variant.info.get('gene_id') if isinstance(variant.info.get('gene_id'), str) else None
+
+        for key, threshold in self.small_dict.items():
+            if key in variant.info and variant.info[key] > threshold:
+                ex_logger.record(
+                    variant=variant,
+                    gene=gene,
+                    sample=None,
+                    applied_moi=applied_moi,
+                    stage='frequency_filter',
+                    reason=f'{key}_too_high',
+                    details={'value': variant.info[key], 'threshold': threshold, 'filter': 'clinvar'},
+                )
+                return True
+
+        if variant.info['ac'] > self.ac_threshold and variant.info['af'] > self.small_af:
+            ex_logger.record(
+                variant=variant,
+                gene=gene,
+                sample=None,
+                applied_moi=applied_moi,
+                stage='frequency_filter',
+                reason='callset_af_too_high',
+                details={
+                    'ac': variant.info['ac'],
+                    'af': variant.info['af'],
+                    'ac_threshold': self.ac_threshold,
+                    'af_threshold': self.small_af,
+                    'filter': 'clinvar',
+                },
+            )
+            return True
+        return False
+
+
+@dataclass
+class ClinVarDominantFilter:
+    """
+    This will apply more lenient filters to ClinVar Pathogenic variants
+    Designed to run on Dominant variants
+    """
+
+    # minimum variant AC to run callset frequency filters
+    ac_threshold: ClassVar[int] = config_retrieve(['ValidateMOI', 'min_callset_ac_to_filter'])
+
+    # a lookup of the attribute name vs. the corresponding configurable filter
+    small_dict: ClassVar[dict[str, float]] = {
+        'gnomad_af': config_retrieve(['ValidateMOI', 'clinvar_dominant_gnomad_max_af']),
+    }
+    small_af: ClassVar[float] = config_retrieve(['ValidateMOI', 'clinvar_dominant_callset_max_af'])
+
+    def too_common(self, variant: SmallVariant, applied_moi: str | None = None) -> bool:
+        """
+        Check if a variant is too common in the population
+
+        Args:
+            variant (SmallVariant): the variant to check
+            applied_moi (str | None): MOI under which this filter is being applied (for exclusion logging only)
+
+        Returns:
+            bool: True if the variant is too common
+        """
+        ex_logger = get_exclusion_logger()
+        gene = variant.info.get('gene_id') if isinstance(variant.info.get('gene_id'), str) else None
+
+        for key, threshold in self.small_dict.items():
+            if key in variant.info and variant.info[key] > threshold:
+                ex_logger.record(
+                    variant=variant,
+                    gene=gene,
+                    sample=None,
+                    applied_moi=applied_moi,
+                    stage='frequency_filter',
+                    reason=f'{key}_too_high',
+                    details={'value': variant.info[key], 'threshold': threshold, 'filter': 'clinvar_dominant'},
+                )
+                return True
+
+        if variant.info['ac'] > self.ac_threshold and variant.info['af'] > self.small_af:
+            ex_logger.record(
+                variant=variant,
+                gene=gene,
+                sample=None,
+                applied_moi=applied_moi,
+                stage='frequency_filter',
+                reason='callset_af_too_high',
+                details={
+                    'ac': variant.info['ac'],
+                    'af': variant.info['af'],
+                    'ac_threshold': self.ac_threshold,
+                    'af_threshold': self.small_af,
+                    'filter': 'clinvar_dominant',
+                },
+            )
+            return True
+        return False
+
+
+class MOIRunner:
+    """
+    The abstract class for a single MOI runner
+    This will be instantiated once per MOI, and run once per related gene, on the collection of all variants in the gene
+    """
+
+    def __init__(self, pedigree: PedigreeParser, target_moi: str):
+        """
+        for each possible MOI, choose the appropriate filters to apply
+        ran into a situation where the ID of target_moi didn't match the
+        exact same MOI as the IDs were different.
+
+        This logic is only called once per MOI, not once per variant
+        """
+
+        self.filter_list: list[BaseMoi] = []
+
+        # for unknown, we catch all possible options?
+        # should we be doing both checks for Monoallelic?
+        if target_moi == 'Monoallelic':
+            self.filter_list = [DominantAutosomal(pedigree=pedigree)]
+        elif target_moi in ['Mono_And_Biallelic', 'Unknown']:
+            self.filter_list = [
+                DominantAutosomal(pedigree=pedigree),
+                RecessiveAutosomalHomo(pedigree=pedigree),
+                RecessiveAutosomalCH(pedigree=pedigree),
+            ]
+        elif target_moi == 'Biallelic':
+            self.filter_list = [
+                RecessiveAutosomalHomo(pedigree=pedigree),
+                RecessiveAutosomalCH(pedigree=pedigree),
+            ]
+
+        elif target_moi == 'Hemi_Mono_In_Female':
+            self.filter_list = [XRecessiveMale(pedigree=pedigree), XDominant(pedigree=pedigree)]
+
+        elif target_moi == 'Hemi_Bi_In_Female':
+            self.filter_list = [
+                XRecessiveMale(pedigree=pedigree),
+                XRecessiveFemaleHom(pedigree=pedigree),
+                XRecessiveFemaleCH(pedigree=pedigree),
+                XPseudoDominantFemale(pedigree=pedigree),
+            ]
+        elif target_moi == 'Mitochondrial':
+            self.filter_list = [
+                Mitochondrial(pedigree=pedigree),
+            ]
+
+        else:
+            raise KeyError(f'MOI type {target_moi} is not addressed in MOI')
+
+    def run(self, principal_var, comp_het: CompHetDict | None = None, partial_pen: bool = False) -> list[ReportVariant]:
+        """
+        run method - triggers each relevant inheritance model
+
+        Args:
+            principal_var (): the variant we are focused on
+            comp_het (dict | None): a lookup of each variant to all potential partners (screened for in-phase)
+            partial_pen (bool): whether to use a partial-penetrance interpretation model
+        """
+
+        if comp_het is None:
+            comp_het = {}
+
+        moi_matched = []
+        for model in self.filter_list:
+            moi_matched.extend(model.run(principal=principal_var, comp_het=comp_het, partial_pen=partial_pen))
+        return moi_matched
+
+
+class BaseMoi:
+    """
+    Definition of the MOI base class
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str):
+        """
+        base class
+        """
+        if applied_moi is None:
+            raise ValueError('An applied MOI needs to reach the Base Class')
+        self.pedigree = pedigree
+        self.applied_moi = applied_moi
+        self.minimum_alt_depth = config_retrieve(['RunSmallFiltering', 'min_alt_depth'], 5)
+        self.minimum_depth = config_retrieve(['RunSmallFiltering', 'minimum_depth'], 10)
+        self.global_filter = GlobalFilter()
+        self.clinvar_filter = ClinVarFilter()
+
+    @abstractmethod
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """
+        run all applicable inheritance patterns and finds good fits
+        """
+
+    def single_variant_explains_disease_in_family(
+        self,
+        sample_id: str,
+        called_variants: set[str],
+        partial_pen: bool = False,
+    ) -> bool:
+        """
+        check for single variant inheritance
+        - find the family ID from this sample
+        - iterate through all family members, and check that MOI holds for all
+
+        Return False if a participant fails tests, True if all checked are ok
+
+        NOTE: this called_variants pool is prepared before calling this method.
+        If we only want to check hom calls, only send hom calls. If we are checking for
+        dominant conditions, we would bundle hom and het calls into this set
+
+        Sex chrom MOI is being broken down in a more granular way, so this may need
+        revisiting
+        """
+
+        this_member = self.pedigree.participants[sample_id]
+
+        # check for valid inheritance within the immediate trio, if possible
+        for member_id in [this_member.father_id, this_member.mother_id]:
+            if member_id is None or (iter_member := self.pedigree.participants.get(member_id)) is None:
+                continue
+
+            # complete & incomplete penetrance - affected samples must have the variant
+            # complete pen. requires participants to be affected if they have the var
+            # if any of these combinations occur, fail the family
+            if (iter_member.is_affected and member_id not in called_variants) or (
+                member_id in called_variants and not partial_pen and iter_member.is_not_affected
+            ):
+                return False
+
+        return True
+
+    def _log_sample_exclusion(
+        self,
+        principal: VARIANT_MODELS,
+        sample_id: str | None,
+        reason: str,
+        stage: str = 'sample_loop',
+        details: dict | None = None,
+    ) -> None:
+        """Single-line helper to record a per-sample exclusion via the optional logger."""
+        get_exclusion_logger().record(
+            variant=principal,
+            gene=principal.info.get('gene_id') if isinstance(principal.info.get('gene_id'), str) else None,
+            sample=sample_id,
+            applied_moi=self.applied_moi,
+            stage=stage,
+            reason=reason,
+            details=details,
+        )
+
+    def sample_passes_basic_checks(
+        self,
+        principal: VARIANT_MODELS,
+        sample_id: str,
+        allow_support: bool,
+    ) -> bool:
+        """
+        Run the four standard per-sample checks (affected, category, depth, alt depth).
+        Returns True if the sample passes; otherwise logs the first failing reason and returns False.
+        Caller is responsible for any additional MOI-specific gates (sex, zygosity).
+        """
+        if sample_id not in self.pedigree.participants:
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'participant_not_in_pedigree',
+                details={'allow_support': allow_support},
+            )
+            return False
+
+        if self.pedigree.participants[sample_id].is_not_affected:
+            # not logging, self-evident
+            # self._log_sample_exclusion(principal, sample_id, 'sample_not_affected')
+            return False
+        if not principal.sample_category_check(sample_id, allow_support=allow_support):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'sample_not_categorised',
+                details={'allow_support': allow_support},
+            )
+            return False
+        if principal.insufficient_read_depth(
+            sample_id,
+            self.minimum_depth,
+            var_is_cat_1=principal.info.get('categorybooleanclinvarplp'),
+        ):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'insufficient_read_depth',
+                details={'threshold': self.minimum_depth},
+            )
+            return False
+        if principal.insufficient_alt_depth(sample_id, self.minimum_alt_depth):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'insufficient_alt_depth',
+                details={'threshold': self.minimum_alt_depth},
+            )
+            return False
+        return True
+
+    def _partner_passes_checks(
+        self,
+        principal: VARIANT_MODELS,
+        partner: VARIANT_MODELS,
+        sample_id: str,
+    ) -> bool:
+        """
+        Apply the comp-het partner-side checks. Logs a single per-sample exclusion (with the partner's coords
+        in details) and returns False on the first failing check; otherwise returns True.
+        """
+        partner_coords = partner.coordinates.string_format
+
+        if partner.insufficient_read_depth(
+            sample_id,
+            self.minimum_depth,
+            partner.info.get('categorybooleanclinvarplp'),
+        ):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'partner_insufficient_read_depth',
+                stage='comp_het',
+                details={'partner': partner_coords, 'threshold': self.minimum_depth},
+            )
+            return False
+        if self.variant_too_common(partner):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'partner_too_common',
+                stage='comp_het',
+                details={'partner': partner_coords},
+            )
+            return False
+        if partner.insufficient_alt_depth(sample_id, self.minimum_alt_depth):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'partner_insufficient_alt_depth',
+                stage='comp_het',
+                details={'partner': partner_coords, 'threshold': self.minimum_alt_depth},
+            )
+            return False
+        if not (
+            principal.sample_category_check(sample_id, allow_support=False)
+            or partner.sample_category_check(sample_id, allow_support=False)
+        ):
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'comp_het_only_support_categories',
+                stage='comp_het',
+                details={'partner': partner_coords},
+            )
+            return False
+        # allow comp-het with a hom and a deletion on opposing alleles, but no other homs
+        if sample_id in principal.hom_samples and partner.coordinates.alt != '<DEL>':
+            self._log_sample_exclusion(
+                principal,
+                sample_id,
+                'hom_principal_partner_not_deletion',
+                stage='comp_het',
+                details={'partner': partner_coords, 'partner_alt': partner.coordinates.alt},
+            )
+            return False
+        return True
+
+    def variant_too_common(self, variant: VARIANT_MODELS) -> bool:
+        """
+        Check if a variant is too common in the population or callset
+
+        Args:
+            variant (VARIANT_MODELS): the variant to check
+
+        Returns:
+            bool: True if the variant is too common
+        """
+        if variant.info.get('categorybooleanclinvarplp'):
+            return self.clinvar_filter.too_common(variant=variant, applied_moi=self.applied_moi)
+        return self.global_filter.too_common(variant, applied_moi=self.applied_moi)
+
+    def get_family_genotypes(self, variant: VARIANT_MODELS, sample_id: str) -> dict[str, str]:
+        """
+
+        Args:
+            variant (VARIANT_MODELS):
+            sample_id (str): the sample ID to gather genotypes for
+
+        Returns:
+            list[str]: a list of all the participants, and GTs
+        """
+
+        def get_sample_genotype(member_id: str, sex: int) -> str:
+            """
+            For this specific member, find the genotype
+
+            Args:
+                member_id (str): sample ID in the pedigree
+                sex (int): male/female/unknown
+
+            Returns:
+                str: text representation of this genotype
+            """
+
+            if variant.coordinates.chrom in X_CHROMOSOME:
+                if sex == 1 and (member_id in variant.het_samples or member_id in variant.hom_samples):
+                    return 'Hemi'
+
+                if member_id in variant.het_samples:
+                    return 'Het'
+                if member_id in variant.hom_samples:
+                    return 'Hom'
+
+            elif member_id in variant.het_samples:
+                return 'Het'
+            elif member_id in variant.hom_samples:
+                return 'Hom'
+
+            return 'WT'
+
+        sample_family_id = self.pedigree.participants[sample_id].family_id
+        return {
+            member.sample_id: get_sample_genotype(member_id=member.sample_id, sex=member.sex)
+            for member in self.pedigree.by_family[sample_family_id]
+        }
+
+    def comp_het_explains_disease_in_family(
+        self,
+        sample_id: str,
+        variant_1: VARIANT_MODELS,
+        variant_2: VARIANT_MODELS,
+    ) -> bool:
+        """
+        use parents to accept or dismiss the comp-het
+        If the 'comp-het' pair are inherited from a single parent, they are in cis
+        rather than trans, and reporting as a comp-het would be misleading.
+
+        compound het is inherently not inherited from a single parent, so rule out
+        when either parent has both, or either parent is affected
+
+        Args:
+            sample_id (str): sample ID to check for
+            variant_1 (VARIANT_MODELS): first variant of comp-het pair
+            variant_2 (VARIANT_MODELS): second variant of comp-het pair
+
+        Returns:
+            bool: True if these two variants form a comp-het
+        """
+
+        # if both vars are present in a single parent: not a compound het
+        # or if the parent is affected: not causative
+        sample_ped_entry = self.pedigree.participants[sample_id]
+        for parent in [sample_ped_entry.mother_id, sample_ped_entry.father_id]:
+            # skip to prevent crashing on !trios, or participants without a pedigree row of their own.
+            if parent is None or self.pedigree.participants.get(parent, None) is None:
+                continue
+
+            if ((parent in variant_1.het_samples) and (parent in variant_2.het_samples)) or self.pedigree.participants[
+                parent
+            ].affected == 2:
+                return False
+        return True
+
+
+class DominantAutosomal(BaseMoi):
+    """This class can also be called by the X-linked Dominant, in which case the Applied_MOI by name is overridden."""
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'Autosomal Dominant'):
+        """
+        Simplest: AD MOI
+        """
+
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+        self.global_filter = DominantFilter()
+        self.clinvar_filter = ClinVarDominantFilter()
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """Simplest MOI, exclusions based on HOM count and AF."""
+
+        classifications = []
+
+        if self.variant_too_common(principal):
+            return classifications
+
+        # autosomal dominant doesn't require support, but consider het and hom
+        samples_with_this_variant = principal.het_samples.union(principal.hom_samples)
+        for sample_id in samples_with_this_variant:
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=False):
+                continue
+
+            # check if this is a candidate for dominant inheritance
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=samples_with_this_variant,
+                partial_pen=partial_pen,
+            ):
+                self._log_sample_exclusion(principal, sample_id, 'family_check_failed', stage='family_check')
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    reasons=self.applied_moi,
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    flags=principal.get_sample_flags(sample_id),
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+
+        return classifications
+
+
+class RecessiveAutosomalCH(BaseMoi):
+    """
+    inheritance test class for Recessive inheritance
+    requires single hom variant, or compound het
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'Autosomal Recessive Comp-Het'):
+        """ """
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,
+        partial_pen: bool = False,  # noqa: ARG002
+    ) -> list[ReportVariant]:
+        """
+        Valid if present as compound het
+        counts as being phased if a compound het is split between parents
+        """
+
+        if comp_het is None:
+            comp_het = {}
+
+        classifications = []
+
+        # reject support for dominant MOI, apply checks based on var type
+        if self.variant_too_common(principal):
+            return classifications
+
+        # if hets are present, try and find support - if the partner is a deletion or SV, hets can appear as homs
+        for sample_id in principal.het_samples | principal.hom_samples:
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=True):
+                continue
+
+            partner_variants = []
+
+            for partner in comp_het[sample_id].get(principal.coordinates.string_format, []):
+                if not self._partner_passes_checks(principal, partner, sample_id):
+                    continue
+
+                if not self.comp_het_explains_disease_in_family(
+                    sample_id=sample_id,
+                    variant_1=principal,
+                    variant_2=partner,
+                ):
+                    self._log_sample_exclusion(
+                        principal,
+                        sample_id,
+                        'family_check_failed',
+                        stage='family_check',
+                        details={'partner': partner.coordinates.string_format},
+                    )
+                    continue
+
+                partner_variants.append(partner)
+
+            if partner_variants:
+                classifications.append(
+                    ReportVariant(
+                        sample=sample_id,
+                        family=self.pedigree.participants[sample_id].family_id,
+                        gene=principal.info.get('gene_id'),
+                        var_data=get_str_var_data(principal, sample_id),
+                        categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                        reasons=self.applied_moi,
+                        genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                        # SVs may not have a var_link
+                        support_vars={
+                            partner.info.get('var_link', partner.coordinates.string_format)
+                            for partner in partner_variants
+                        },
+                        flags=principal.get_sample_flags(sample_id)
+                        | set(chain.from_iterable(partner.get_sample_flags(sample_id) for partner in partner_variants)),
+                        clinvar_stars=principal.info.get('clinvar_stars'),
+                    ),
+                )
+
+        return classifications
+
+
+class RecessiveAutosomalHomo(BaseMoi):
+    """
+    inheritance test class for Recessive inheritance
+    requires single hom variant, or compound het
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'Autosomal Recessive Homozygous'):
+        """ """
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """
+        explicitly tests HOMs
+
+        Args:
+            principal (VARIANT_MODELS): main variant being evaluated
+            comp_het (dict): comp-het partners
+            partial_pen (bool):
+
+        Returns:
+            list[ReportVariant]: data object if RecessiveAutosomal fits
+        """
+
+        classifications = []
+
+        # remove if too many homs are present in population databases
+        if self.variant_too_common(principal):
+            return classifications
+
+        for sample_id in principal.het_samples | principal.hom_samples:
+            if sample_id not in principal.hom_samples:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_homozygous')
+                continue
+
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=False):
+                continue
+
+            # check if this is a possible candidate for homozygous inheritance
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=principal.hom_samples,
+                partial_pen=partial_pen,
+            ):
+                self._log_sample_exclusion(principal, sample_id, 'family_check_failed', stage='family_check')
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    reasons=self.applied_moi,
+                    flags=principal.get_sample_flags(sample_id),
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+
+        return classifications
+
+
+class XDominant(BaseMoi):
+    """
+    for males and females, accept het
+    effectively the same as DominantAutosomal?
+    just override the type, and use AD
+
+    GATK MALES ARE CALLED HOM (OR HET pseudo-autosomal?)
+    re-implement here, but don't permit Male X-Homs
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'X_Dominant'):
+        """accept male hets and homs, and female hets without support."""
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+        self.global_filter = DominantFilter()
+        self.clinvar_filter = ClinVarDominantFilter()
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """
+        If variant is present and sufficiently rare, we take it. discarded if support only.
+        """
+
+        classifications = []
+
+        # more stringent Pop.Freq checks for dominant - hemi restriction
+        if self.variant_too_common(principal):
+            return classifications
+
+        # all samples which have a variant call
+        samples_with_this_variant = principal.het_samples.union(principal.hom_samples)
+
+        for sample_id in samples_with_this_variant:
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=False):
+                continue
+
+            # check if this is a candidate for dominant inheritance
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=samples_with_this_variant,
+                partial_pen=partial_pen,
+            ):
+                self._log_sample_exclusion(principal, sample_id, 'family_check_failed', stage='family_check')
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    reasons=self.applied_moi,
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    flags=principal.get_sample_flags(sample_id),
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+        return classifications
+
+
+class XPseudoDominantFemale(BaseMoi):
+    """
+    X-Dominant method which only evaluates females, on the basis that a healthy allele could be inactivated
+    A special case of X-Dominant, where we consider Het. variants, used to assess genes which are on X and in genes
+    associated with a Biallelic MOI
+
+    Basically a Dominant MOI to be applied to Recessive genes, and results will be labelled as cautionary
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'X_PseudoDominant'):
+        """Accept male hets and homs, and female hets without support/"""
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+        self.global_filter = DominantFilter()
+        self.clinvar_filter = ClinVarDominantFilter()
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """If variant is present and sufficiently rare, we take it. Discarded if support."""
+
+        # unused in this class, we always run this with partial penetrance
+        _unused = partial_pen
+
+        classifications = []
+
+        # more stringent Pop.Freq checks for dominant - hemi restriction
+        if self.variant_too_common(principal):
+            return classifications
+
+        # all females which have a variant call
+        all_with_variant = principal.het_samples.union(principal.hom_samples)
+        all_males = {sam for sam in all_with_variant if self.pedigree.participants[sam].is_male}
+        for sample_id in all_with_variant:
+            participant = self.pedigree.participants[sample_id]
+            if not participant.is_female:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_female')
+                continue
+            if sample_id not in principal.het_samples:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_heterozygous')
+                continue
+
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=False):
+                continue
+
+            # check if this is a candidate for dominant inheritance
+            # as we're allowing for flexible 'penetrance' in females, we send all het and hom variants, but allow for a
+            # partial penetrance check - the participants can have the variant, but not be affected. They may not be
+            # affected without the variant call.
+            # males are tested separately, with complete penetrance. Pool of samples is Males + proband.
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=all_males | {sample_id},
+            ):
+                self._log_sample_exclusion(
+                    principal, sample_id, 'pseudo_family_check_failed__male', stage='family_check'
+                )
+                continue
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=all_with_variant,
+                partial_pen=True,
+            ):
+                self._log_sample_exclusion(
+                    principal, sample_id, 'pseudo_family_check_failed__all', stage='family_check'
+                )
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    reasons=self.applied_moi,
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    flags=principal.get_sample_flags(sample_id)
+                    | {'Affected female with heterozygous variant in XLR gene'},
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+        return classifications
+
+
+class XRecessiveMale(BaseMoi):
+    """
+    accept all male non-ref GTs - male variants HOM because GATK
+    effectively the same as AutosomalDominant?
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'X_Male'):
+        """Set parameters specific to male X tests."""
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+        self.global_filter = DominantFilter()
+        self.clinvar_filter = ClinVarDominantFilter()
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """Apply filtering specific to variants on X in Males."""
+
+        classifications = []
+
+        # remove from analysis if too many homs are present in population databases
+        if self.variant_too_common(principal):
+            return classifications
+
+        # combine het and hom here, we don't trust the variant callers
+        # if hemi count is too high, don't consider males
+        # never consider support variants on X for males
+        all_with_variant = principal.het_samples.union(principal.hom_samples)
+        males = {sam for sam in all_with_variant if self.pedigree.participants[sam].is_male}
+
+        for sample_id in all_with_variant:
+            if not self.pedigree.participants[sample_id].is_male:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_male')
+                continue
+
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=False):
+                continue
+
+            # check if this is a possible candidate for homozygous inheritance
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=males,
+                partial_pen=partial_pen,
+            ):
+                self._log_sample_exclusion(principal, sample_id, 'family_check_failed', stage='family_check')
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    reasons=self.applied_moi,
+                    flags=principal.get_sample_flags(sample_id),
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+        return classifications
+
+
+class XRecessiveFemaleHom(BaseMoi):
+    """
+    only consider HOM females
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'X_Recessive HOM Female'):
+        """Set parameters specific to recessive tests."""
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,
+    ) -> list[ReportVariant]:
+        """ """
+
+        classifications = []
+
+        # remove from analysis if too many homs are present in population databases
+        if self.variant_too_common(principal):
+            return classifications
+
+        # never consider support homs
+        samples_to_check = {sam for sam in principal.hom_samples if self.pedigree.participants[sam].is_female}
+        all_with_variant = principal.het_samples | principal.hom_samples
+
+        for sample_id in all_with_variant:
+            participant = self.pedigree.participants[sample_id]
+            if not participant.is_female:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_female')
+                continue
+            if sample_id not in principal.hom_samples:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_homozygous')
+                continue
+
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=False):
+                continue
+
+            # check if this is a possible candidate for homozygous inheritance
+            if not self.single_variant_explains_disease_in_family(
+                sample_id=sample_id,
+                called_variants=samples_to_check,
+                partial_pen=partial_pen,
+            ):
+                self._log_sample_exclusion(principal, sample_id, 'family_check_failed', stage='family_check')
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    reasons=self.applied_moi,
+                    flags=principal.get_sample_flags(sample_id),
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+        return classifications
+
+
+class XRecessiveFemaleCH(BaseMoi):
+    """
+    ignore males, accept female comp-het only
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'X_RecessiveFemaleCompHet'):
+        """Set parameters specific to recessive tests on X in females, specific to Compound-Heterozygous pairs."""
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,
+        partial_pen: bool = False,  # noqa: ARG002
+    ) -> list[ReportVariant]:
+        """ """
+
+        if comp_het is None:
+            comp_het = {}
+
+        classifications = []
+
+        # remove from analysis if too many homs are present in population databases
+        if self.variant_too_common(principal):
+            return classifications
+
+        # if het/hom females are present, try and find support
+        for sample_id in principal.het_samples | principal.hom_samples:
+            if not self.pedigree.participants[sample_id].is_female:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_female')
+                continue
+
+            if not self.sample_passes_basic_checks(principal, sample_id, allow_support=True):
+                continue
+
+            # collect all valid partners once, into a single combined 'event'
+            partner_variants = []
+
+            for partner in comp_het[sample_id].get(principal.coordinates.string_format, []):
+                if not self._partner_passes_checks(principal, partner, sample_id):
+                    continue
+
+                if not self.comp_het_explains_disease_in_family(
+                    sample_id=sample_id,
+                    variant_1=principal,
+                    variant_2=partner,
+                ):
+                    self._log_sample_exclusion(
+                        principal,
+                        sample_id,
+                        'family_check_failed',
+                        stage='family_check',
+                        details={'partner': partner.coordinates.string_format},
+                    )
+                    continue
+
+                partner_variants.append(partner)
+
+            # add a single event with all valid comp-het partners.
+            if partner_variants:
+                classifications.append(
+                    ReportVariant(
+                        sample=sample_id,
+                        family=self.pedigree.participants[sample_id].family_id,
+                        gene=principal.info.get('gene_id'),
+                        var_data=get_str_var_data(principal, sample_id),
+                        categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                        reasons=self.applied_moi,
+                        genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                        support_vars={
+                            partner.info.get('var_link', partner.coordinates.string_format)
+                            for partner in partner_variants
+                        },
+                        flags=principal.get_sample_flags(sample_id)
+                        | set(chain.from_iterable(partner.get_sample_flags(sample_id) for partner in partner_variants)),
+                        clinvar_stars=principal.info.get('clinvar_stars'),
+                    ),
+                )
+        return classifications
+
+
+class Mitochondrial(BaseMoi):
+    """
+    ignore males, accept female comp-het only
+    """
+
+    def __init__(self, pedigree: PedigreeParser, applied_moi: str = 'Mitochondrial'):
+        """
+        Set parameters specific to mitochondrial.
+        Currently, Mito only works with ClinVar, which is given a partially-penetrant interpretation, so maternally
+        inherited will never be disqualifying. This is basically a presence in proband test.
+        """
+        super().__init__(pedigree=pedigree, applied_moi=applied_moi)
+        self.global_filter = DominantFilter()
+        self.clinvar_filter = ClinVarDominantFilter()
+        self.plasmy_threshold = config_retrieve(['ValidateMOI', 'heteroplasmy_min'], 0.2)
+
+    def run(
+        self,
+        principal: VARIANT_MODELS,
+        comp_het: CompHetDict | None = None,  # noqa: ARG002
+        partial_pen: bool = False,  # noqa: ARG002
+    ) -> list[ReportVariant]:
+        """ """
+
+        classifications = []
+
+        # no need for a too-common test, we don't currently have pop. freq data
+        for sample_id in principal.het_samples | principal.hom_samples:
+            if self.pedigree.participants[sample_id].is_not_affected:
+                # not logging, self-evident
+                # self._log_sample_exclusion(principal, sample_id, 'sample_not_affected')
+                continue
+
+            if not principal.sample_category_check(sample_id, allow_support=True):
+                self._log_sample_exclusion(
+                    principal,
+                    sample_id,
+                    'sample_not_categorised',
+                    details={'allow_support': True},
+                )
+                continue
+
+            if not principal.min_alt_ratio(sample_id, self.plasmy_threshold):
+                self._log_sample_exclusion(
+                    principal,
+                    sample_id,
+                    'plasmy_below_threshold',
+                    details={'threshold': self.plasmy_threshold},
+                )
+                continue
+
+            classifications.append(
+                ReportVariant(
+                    sample=sample_id,
+                    family=self.pedigree.participants[sample_id].family_id,
+                    gene=principal.info.get('gene_id'),
+                    var_data=get_str_var_data(principal, sample_id),
+                    categories={key: get_granular_date() for key in principal.category_values(sample_id)},
+                    reasons=self.applied_moi,
+                    genotypes=self.get_family_genotypes(variant=principal, sample_id=sample_id),
+                    flags=principal.get_sample_flags(sample_id),
+                    clinvar_stars=principal.info.get('clinvar_stars'),
+                ),
+            )
+
+        return classifications

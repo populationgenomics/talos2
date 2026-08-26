@@ -1,0 +1,115 @@
+[GeneratePanelData]
+default_panel = 137
+panelapp = "https://panelapp-aus.org/api/v1/panels"
+require_pheno_match = [ "FLG", "GJB2", "F2", "F5", "HFE"]
+within_x_months = 24
+forbidden_genes = []
+forced_panels = [ 144, 239]
+
+# confidence level - set this to a lower value to allow non-green PanelApp genes into the analysis
+# 3 = Green only
+# 2 = Amber or Green only
+# 1 = Red, Amber, or Green
+confidence_level = 3
+
+[[GeneratePanelData.manual_overrides]]
+# this section permits the manual addition of genes to the panel data
+# each gene here will be folded into the panelapp data after standard API queries have taken place
+# if the gene was already identified for this analysis, the MOI provided here will take precedent
+# if the gene here was not identified through panelapp, a new entity will be added, and the panel ID
+# associated with it will be the number zero (panel IDs must all be numeric, 0 is not in use)
+
+# this field is mandatory - the ENSG ID of the gene
+ensg = 'ENSG0000012345'
+
+# this field should be supplied, if omitted will default to Mono_And_Biallelic
+moi = 'Biallelic'
+
+# optional - if ommitted the gene symbol will be looked up in the Ensembl data
+symbol = 'AGENE'
+
+# optional
+chrom = '1'
+
+[RunSmallFiltering]
+ac_threshold = 0.01
+additional_csq = [ "missense", "inframe_deletion", "inframe_insertion"]
+af_semi_rare = 0.01
+callset_af_sv_recessive = 0.03
+critical_csq = [ "frameshift", "splice_acceptor", "splice_donor", "start_lost", "stop_gained", "stop_lost",]
+max_parent_ab = 0.05
+minimum_depth = 10
+spliceai = 0.5
+csq_string = [ "consequence", "gene_id", "gene", "transcript", "mane_id", "mane", "biotype", "dna_change", "amino_acid_change", "codon", "ensp", "am_class", "am_pathogenicity",]
+min_alt_depth = 5
+am_pathogenicity = 0.564
+
+[RunSmallFiltering.de_novo]
+min_child_ab = 0.2
+min_depth = 5
+max_depth = 1000
+min_proband_gq = 25
+min_alt_depth = 5
+
+[ValidateMOI]
+## opt-in enhanced logging to explain reasons for candidate variants being skipped
+#super_logging = true
+#super_logging_path = "exclusions.jsonl.gz"
+
+# callset AF filtering will only be applied to variants with this AC or higher
+min_callset_ac_to_filter = 10
+
+# Global frequency filter
+# Applied to all variants regardless of MOI. Variants reported in ClinVar as P/LP are exempt from these filters
+gnomad_max_af = 0.01
+gnomad_sv_max_af = 0.03
+
+# callset_* filters only apply to variants with a callset AC > min_callset_ac_to_filter.
+callset_max_af = 0.01
+callset_sv_max_af = 0.03
+
+gnomad_max_homozygotes = 5
+gnomad_max_hemizygotes = 5
+
+# Dominant frequency filters - only applied to variants being considered for a dominant MOI.
+# Variants reported in ClinVar as P/LP are exempt from these filters
+dominant_gnomad_max_af = 0.00001
+dominant_gnomad_sv_max_af = 0.01
+dominant_gnomad_max_ac = 10
+dominant_gnomad_max_homozygotes = 0
+
+# callset_* filters only apply to variants with a callset AC > min_callset_ac_to_filter.
+dominant_callset_max_af = 0.01
+dominant_callset_sv_max_af = 0.01
+dominant_callset_max_ac = 10
+
+# Clinvar frequency filters
+# Applied to variants reported as P/LP in clinvar
+clinvar_gnomad_max_af = 0.05
+clinvar_dominant_gnomad_max_af = 0.00005
+
+# callset_* filters only apply to variants with a callset AC > min_callset_ac_to_filter.
+clinvar_callset_max_af = 0.05
+clinvar_dominant_callset_max_af = 0.05
+
+# any categories in this list will be ignored.
+ignore_categories = []
+
+# categories where a variant can 'support' another variant, e.g. Comp-Het, but a variant which only has categories in
+# this list will not feature as a homozygous variant or dominant single hit
+support_categories = ["alphamissense", "clinvar0star"]
+
+# variants where all applied categories are in this list are removed from the report unless the gene or variant is
+# flagged as being a good phenotypic fit for the specific case
+phenotype_match = ["alphamissense"]
+
+# un-comment this to apply a minimum GQ to all samples in the trio, including WT. This will reduce de Novo prediciton
+# if data was merged from single-sample VCFs (WTs/absent from single sample VCF will be inserted as WT/GQ=0)
+#min_all_sample_gq = 15
+
+[HPOFlagging]
+semantic_match = true
+min_similarity = 14.0
+
+[CreateTalosHTML]
+remove_solved_cases = true

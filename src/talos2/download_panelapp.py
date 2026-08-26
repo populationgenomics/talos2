@@ -1,0 +1,397 @@
+"""
+Prior to the creation of this script, PanelApp was queried on two separate occasions per run:
+
+- once to get all the panels in PanelApp, and the associated HPO terms for each
+- once to get the gene data for each panel
+
+There's a couple of ways in which this is wasteful:
+- PanelApp is only updated once per month, but this querying goes on in every run
+- the original API query implementation was in series, not parallel, due to server instability, so it was slow
+
+In addition to the above, the core assumption here is that deployment environments will have an internet connection.
+That is typically not true of HPC environments, making this a tough workflow to run in those environments.
+
+This script queries for the whole of PanelApp in one go, using a barrage of highly parallelised queries:
+- use the panels endpoint to get all the panels, and their associated HPO terms
+- use the panel-genes endpoint to pull all the gene content for each panel
+- use the panel-activities endpoint to pull the activity log for each panel
+
+Save ALL this data:
+- collect a list of all current panel IDs/names/versions
+- for each panel, collect the associated phenotypic terms
+- for each gene, collect the IDs of the panels it appears on, and the date it was first graded green
+
+STR-specific feature - parses the PanelApp Repeat Disorders panel
+"""
+
+import asyncio
+import re
+from argparse import ArgumentParser
+
+import aiohttp
+from dateutil.parser import parse
+from loguru import logger
+
+from talos2.config import ConfigError, config_retrieve
+from talos2.models import (
+    DownloadedPanelApp,
+    DownloadedPanelAppGene,
+    DownloadedPanelAppGenePanelDetail,
+    HpoTerm,
+    PanelShort,
+)
+from talos2.utils import get_json_response
+
+ENTITY_TYPE_CONSTANT = 'entity_type'
+GENE_CONSTANT = 'gene'
+HPO_RE = re.compile(r'HP:\d+')
+ACTIVITY_CONTENT = {'green list (high evidence)', 'expert review green'}
+
+REALLY_OLD = '1970-01-01'
+PANELS_ENDPOINT = 'https://panelapp-aus.org/api/v1/panels'
+DEFAULT_PANEL = 137
+
+try:
+    DEFAULT_PANEL = config_retrieve(['GeneratePanelData', 'default_panel'], DEFAULT_PANEL)
+    PANELS_ENDPOINT = config_retrieve(['GeneratePanelData', 'panelapp'], PANELS_ENDPOINT)
+except (ConfigError, KeyError):
+    logger.warning('Config environment variable TALOS_CONFIG not set, or keys missing, falling back to Aussie PanelApp')
+
+# if this is a massive result, it returns over a number of pages
+PANEL_TEMPLATE_URL = f'{PANELS_ENDPOINT}/{{id}}'
+ACTIVITY_TEMPLATE = f'{PANELS_ENDPOINT}/{{id}}/activities'
+STR_TEMPLATE = f'{PANELS_ENDPOINT}/3597/strs?confidence_level=3'
+MITO_BAD = 'MT'
+MITO_GOOD = 'M'
+
+
+def get_panels_and_hpo_terms(endpoint: str = PANELS_ENDPOINT) -> dict[int, list[HpoTerm]]:
+    """
+    query panelapp, collect each panel by its HPO terms
+
+    Args:
+        endpoint (str): URL for panels
+
+    Returns:
+        dict: {panel_ID: [HPO term, HPO term]}
+    """
+
+    panels_by_hpo: dict[int, list[HpoTerm]] = {}
+
+    while True:
+        endpoint_data = get_json_response(endpoint)
+        for panel in endpoint_data['results']:
+            panel_id = int(panel['id'])
+
+            panels_by_hpo[panel_id] = []
+
+            # can be split over multiple strings, so join then search
+            relevant_disorders = ' '.join(panel['relevant_disorders'] or [])
+            for match in re.findall(HPO_RE, relevant_disorders):
+                panels_by_hpo[panel_id].append(HpoTerm(id=match, label=''))
+
+        # cycle through additional pages
+        if endpoint := endpoint_data['next']:
+            continue
+        break
+
+    return panels_by_hpo
+
+
+def parse_panel_activity(panel_activity: list[dict]) -> dict[str, str]:
+    """
+    reads in the panel activity dictionary, and for each green entity, finds the date at
+    which the entity obtained a Green rating
+
+    Args:
+        panel_activity (list[dict]):
+
+    Returns:
+        dict, mapping gene symbol to the date it was first graded green (high evidence)
+    """
+
+    return_dict: dict[str, str] = {}
+
+    # do some stuff
+    for activity_entry in panel_activity:
+        # only interested in genes at the moment
+        if activity_entry.get(ENTITY_TYPE_CONSTANT) != GENE_CONSTANT:
+            continue
+
+        # get the name of the gene
+        gene_name = activity_entry['entity_name']
+
+        # check for relevant text
+        lower_text = activity_entry['text'].lower()
+        if not any(each_string in lower_text for each_string in ACTIVITY_CONTENT):
+            continue
+
+        # find the event date for this activity entry
+        creation = parse(activity_entry['created'], ignoretz=True).strftime('%Y-%m-%d')
+
+        # store it
+        return_dict[gene_name] = creation
+
+    return return_dict
+
+
+def parse_panel(
+    panel_data: dict[str, str | list[dict]],
+    panel_activities: list[dict],
+) -> dict:
+    """
+
+    Args:
+        panel_data ():
+        panel_activities ():
+    """
+
+    # this will contain a range of bits, indexed on ENSG
+    panel_gene_content: dict = {}
+
+    green_dates: dict[str, str] = parse_panel_activity(panel_activities)
+
+    # iterate over the genes in this panel result
+    for gene in panel_data['genes']:
+        # please the linter
+        if not isinstance(gene, dict):
+            raise TypeError(f'Gene {gene} is not a dict')
+
+        symbol: str = gene['symbol']
+        ensg: str = gene['ensg']
+
+        # no ENSG at all, skip completely
+        if not ensg:
+            logger.info(f'Gene {symbol}/{ensg} removed for lack of chrom or ENSG annotation')
+            continue
+
+        panel_gene_content[ensg] = {
+            'symbol': symbol,
+            'chrom': gene['chrom'],
+            'location': gene['location'],
+            'moi': gene['moi'],
+            'green_date': green_dates.get(symbol, REALLY_OLD),
+            'confidence_level': gene['confidence_level'],
+        }
+
+    return panel_gene_content
+
+
+def get_latest_ensembl_data(grch38_versions) -> tuple[str, str] | None:
+    """
+    Parsing method to choose the latest (highest version number) ensembl ID and location
+
+    Args:
+        grch38_versions: the panel.gene_data.ensembl_genes data from the PanelApp API response
+
+    Returns:
+        either a String pair, the ensembl gene ID and the location, or None
+    """
+    if not grch38_versions:
+        return None
+
+    def sort_key(k) -> tuple[int, str]:
+        return (int(k), k) if k.isdigit() else (-1, k)
+
+    latest_key = max(grch38_versions.keys(), key=sort_key)
+    if ensembl_id := grch38_versions[latest_key].get('ensembl_id'):
+        return (
+            ensembl_id,
+            grch38_versions[latest_key]['location'],
+        )
+    return None
+
+
+async def get_single_panel(session: aiohttp.ClientSession, panel_id: int) -> dict[int, dict[str, str | list[dict]]]:
+    """
+    Async method to return data from a single panel.
+    Does most of the initial parsing of panel data to reduce memory footprint.
+
+    Args:
+        session: aiohttp ClientSession
+        panel_id: int, panel ID to search for
+
+    Returns:
+        dict, indexed by panel ID, containing panel genes, name, and version
+    """
+    panel_url = PANEL_TEMPLATE_URL.format(id=panel_id)
+    gene_results: list[dict] = []
+
+    async with session.get(panel_url) as resp:
+        response = await resp.json()
+
+        # thin out the results, what do we need?
+        panel_name = response['name']
+        panel_version = response['version']
+        for gene in response['genes']:
+            # genes only here for now
+            if gene['entity_type'] != 'gene':
+                continue
+
+            # find the latest available ensembl gene block
+            if latest_content := get_latest_ensembl_data(gene['gene_data']['ensembl_genes'].get('GRch38', {})):
+                ensg, location = latest_content
+                chrom = location.split(':')[0]
+                if chrom == MITO_BAD:
+                    chrom = MITO_GOOD
+
+            # Pydantic model won't tolerate None here, ENSG is pretty integral to downstream processes
+            else:
+                continue
+
+            gene_results.append(
+                {
+                    'symbol': gene['entity_name'],
+                    'chrom': chrom,
+                    'location': location,
+                    'ensg': ensg,
+                    'moi': gene.get('mode_of_inheritance', 'unknown').lower(),
+                    'confidence_level': int(gene['confidence_level']),
+                }
+            )
+
+    return {panel_id: {'name': panel_name, 'version': panel_version, 'genes': gene_results}}
+
+
+async def get_single_panel_activities(session: aiohttp.ClientSession, panel_id: int) -> dict:
+    """Async method to get activities from a single panel"""
+
+    async with session.get(ACTIVITY_TEMPLATE.format(id=panel_id)) as resp:
+        reponse = await resp.json()
+        return {panel_id: reponse}
+
+
+async def get_all_known_panels(panel_ids: set[int], activities: bool = False) -> dict:
+    """Take all the panel IDs, asynchronously query for them. If panelapp dies it dies."""
+
+    tasks = []
+
+    async with aiohttp.ClientSession() as session:
+        for panel_id in panel_ids:
+            if activities:
+                tasks.append(asyncio.ensure_future(get_single_panel_activities(session, panel_id)))
+            else:
+                tasks.append(asyncio.ensure_future(get_single_panel(session, panel_id)))
+
+        all_panel_details = await asyncio.gather(*tasks)
+
+    return {int(pid): data for panel in all_panel_details for pid, data in panel.items()}
+
+
+def parse_repeat_disorders() -> tuple[set[str], set[str]]:
+    """Parse panel 3597 - find all genes with a green association to a STR disorder."""
+    str_genes: set[str] = set()
+    str_symbols: set[str] = set()
+    for each_result in get_json_response(STR_TEMPLATE)['results']:
+        str_association = each_result['gene_data']
+        str_symbols.add(str_association['gene_symbol'])
+
+        for build, content in str_association['ensembl_genes'].items():
+            if build.lower() == 'grch38':
+                # the ensembl version may alter over time, but will be singular
+                ensembl_data = content[next(iter(content.keys()))]
+                ensg = ensembl_data['ensembl_id']
+                str_genes.add(ensg)
+
+    return str_genes, str_symbols
+
+
+def cli_main():
+    logger.info('Starting PanelApp parsing')
+    parser = ArgumentParser()
+    parser.add_argument('--output', help='Where to write Panel data', required=True)
+    args = parser.parse_args()
+    main(output=args.output)
+
+
+def main(output: str):
+    """
+    query PanelApp - get EVERYTHING
+
+    Args:
+        output (str): path to an output destination
+    """
+
+    # set up a collection object - loaded method execution
+    collected_panel_data = DownloadedPanelApp(hpos=get_panels_and_hpo_terms())
+
+    all_panels = set(collected_panel_data.hpos.keys())
+
+    async def _fetch_all() -> tuple[dict, dict]:
+        return await asyncio.gather(
+            get_all_known_panels(all_panels),
+            get_all_known_panels(all_panels, activities=True),
+        )
+
+    all_panel_data, all_panel_activities = asyncio.run(_fetch_all())
+
+    zero_green_panels: list[int] = []
+
+    # iterate over the gathered panels
+    for panel_id, panel_data in all_panel_data.items():
+        if not panel_data['genes']:
+            logger.warning(f'No Genes on panel {panel_id}')
+            zero_green_panels.append(panel_id)
+            continue
+
+        logger.info(f'Processing panel {panel_id}')
+
+        # get the activity log for this panel
+        panel_activities = all_panel_activities[panel_id]
+
+        # parse the data & activities
+        parsed_panel_data = parse_panel(
+            panel_data=panel_data,
+            panel_activities=panel_activities,
+        )
+
+        collected_panel_data.versions.append(
+            PanelShort(
+                id=panel_id,
+                name=panel_data['name'],
+                version=panel_data['version'],
+            ),
+        )
+
+        for gene, gene_data in parsed_panel_data.items():
+            # already seen - update some attributes
+            if prev_gene_data := collected_panel_data.genes.get(gene):
+                prev_gene_data.panels[panel_id] = DownloadedPanelAppGenePanelDetail(
+                    moi=gene_data['moi'],
+                    date=gene_data['green_date'],
+                    confidence=gene_data['confidence_level'],
+                )
+
+            else:
+                collected_panel_data.genes[gene] = DownloadedPanelAppGene(
+                    chrom=gene_data['chrom'],
+                    location=gene_data['location'],
+                    symbol=gene_data['symbol'],
+                    ensg=gene,
+                    panels={
+                        panel_id: DownloadedPanelAppGenePanelDetail(
+                            moi=gene_data['moi'],
+                            date=gene_data['green_date'],
+                            confidence=gene_data['confidence_level'],
+                        ),
+                    },
+                )
+
+    # strip out any panels with no green genes on, so they're not considered for HPO matches
+    for panel_id in zero_green_panels:
+        logger.info(f'Removing panel {panel_id} from hpo matching - no green genes')
+        del collected_panel_data.hpos[panel_id]
+
+    # query panelapp for the repeat disorders panel
+    str_genes, str_symbols = parse_repeat_disorders()
+
+    # populate the panelapp object
+    collected_panel_data.str_genes = str_genes
+    collected_panel_data.str_symbols = str_symbols
+
+    with open(output, 'w') as output_file:
+        output_file.write(collected_panel_data.model_dump_json(indent=4))
+
+
+if __name__ == '__main__':
+    cli_main()
