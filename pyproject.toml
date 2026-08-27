@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name='talos2'
 description='Centre for Population Genomics Variant Prioritisation'
 readme = "README.md"
-version="0.0.1"
+version="0.0.2"
 
 # pinned below python 3.13 for compatibility with semsimian
 requires-python = ">=3.10,<3.13"
@@ -118,7 +118,7 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.per-file-ignores]
 
 [tool.bumpversion]
-current_version = "0.0.1"
+current_version = "0.0.2"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true

@@ -4,7 +4,7 @@
 # reconciled with Hail's. Hail is no longer a dependency, and SVAFotate's setup.py asks only for
 # pandas/numpy/pyranges/cyvcf2, with a ceiling on compatible pandas version.
 #
-# build with "docker build -t talos2:0.0.1 ."
+# build with "docker build -t talos2:0.0.2 ."
 
 # SVAFotate is not published to PyPI and the repository carries no releases or tags, so it is pinned to
 # an explicit commit. Installed from the GitHub tarball rather than git+https, which keeps git out of the
@@ -70,7 +70,7 @@ COPY --from=compiler /bcftools_install/usr/local/bin/* /usr/local/bin/
 COPY --from=compiler /bcftools_install/usr/local/libexec/bcftools/* /usr/local/libexec/bcftools/
 
 ARG ECHTVAR_VERSION=v0.2.2
-ENV VERSION=0.0.1
+ENV VERSION=0.0.2
 
 RUN wget -q -O /bin/echtvar "https://github.com/brentp/echtvar/releases/download/${ECHTVAR_VERSION}/echtvar" && \
     chmod +x /bin/echtvar
