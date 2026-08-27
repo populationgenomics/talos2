@@ -53,22 +53,28 @@ workflow SV_ANNOTATION {
     }
     ch_svafotate_bed = channel.fromPath(params.svafotate_bed, checkIfExists: true).first()
 
-    // previously annotated SV VCFs are read from the same root as the small-variant shards
-    def annotated_root = params.annotated_dir ?: workflow.outputDir
+    // previously annotated SV VCFs are read from the same root as the small-variant shards.
+    // keep this a Path and resolve() against it - interpolating a cloud Path into a string
+    // drops the gs:// scheme, so the exists() check silently ran against the local filesystem
+    def annotated_root = file(params.annotated_dir ?: workflow.outputDir)
 
     // split cohorts three ways - no SV data ([] is falsy), already annotated, or work to do
     // row is tuple(cohort, sv_vcf, config)
     ch_branched = ch_sv_inputs.branch { row ->
         no_sv:    !row[1]
-        complete: file("${annotated_root}/${row[0]}_annotated/${row[0]}_sv_annotated.vcf.bgz").exists()
+        complete: annotated_root.resolve("${row[0]}_annotated").resolve("${row[0]}_sv_annotated.vcf.bgz").exists()
         pending:  true
     }
 
     // pick the previously annotated VCF up from the output directory instead of regenerating it
     ch_complete = ch_branched.complete.map { row ->
-        def annotated = "${annotated_root}/${row[0]}_annotated/${row[0]}_sv_annotated.vcf.bgz"
-        println "Annotated SV VCF for ${row[0]} already exists (${annotated}), skipping SV annotation"
-        tuple(row[0], file(annotated), file("${annotated}.tbi", checkIfExists: true))
+        def annotated = annotated_root.resolve("${row[0]}_annotated").resolve("${row[0]}_sv_annotated.vcf.bgz")
+        println "Annotated SV VCF for ${row[0]} already exists (${annotated.toUriString()}), skipping SV annotation"
+        def tbi = annotated.resolveSibling("${annotated.name}.tbi")
+        if (!tbi.exists()) {
+            error("Annotated SV VCF for ${row[0]} exists but its index is missing: ${tbi.toUriString()}")
+        }
+        tuple(row[0], annotated, tbi)
     }
 
     ch_pending_vcfs = ch_branched.pending.map { row ->
