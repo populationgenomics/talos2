@@ -95,8 +95,15 @@ start_download() {
     if [ -z "$TMX_WINDOW_ID" ]; then
       TMX_WINDOW_ID=$($TMX new-window -P -n "$WINDOW_NAME" "$cmd")
     else
-      $TMX split-window -v -t "$TMX_WINDOW_ID" "$cmd"
-      $TMX select-layout -t "$TMX_WINDOW_ID" even-vertical
+      # tmux refuses a split once panes get too small ("no space for new pane").
+      # A failed split must not lose the download - fall back to a plain
+      # background job whose output goes to the logfile only.
+      if $TMX split-window -v -t "$TMX_WINDOW_ID" "$cmd" 2>/dev/null; then
+        $TMX select-layout -t "$TMX_WINDOW_ID" tiled
+      else
+        log "[INFO] No tmux pane space left for $output; running in background (see $LOGFILE)."
+        ( eval "$cmd" ) >/dev/null 2>&1 &
+      fi
     fi
   fi
 }
@@ -107,13 +114,14 @@ await() {
   else
     # No downloads were started in tmux — nothing to wait on.
     if [ -z "$TMX_WINDOW_ID" ]; then
+      wait
       return 0
     fi
   last_pane_count=-1
     while true; do
       pane_count=$($TMX list-panes -t "$TMX_WINDOW_ID" 2>/dev/null | wc -l)
       if [ $last_pane_count != $pane_count ]; then
-        $TMX select-layout -t "$TMX_WINDOW_ID" even-vertical
+        $TMX select-layout -t "$TMX_WINDOW_ID" tiled
         last_pane_count=$pane_count
       fi
       if [ $pane_count == 0 ]; then
@@ -121,6 +129,8 @@ await() {
       fi
       sleep "$POLL_INTERVAL"
     done
+    # Downloads that couldn't get a pane ran as plain background jobs.
+    wait
   fi
 }
 
