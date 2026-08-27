@@ -14,12 +14,14 @@ Python env is managed by `uv` (`uv.lock` is authoritative for the container buil
 
 ```bash
 uv sync --frozen --extra test          # dev install
-uv run pytest                          # full suite (see caveat below)
+uv run pytest -n auto                  # full suite (see caveat below)
 uv run pytest test/test_moi_tests.py -k test_genotype_calls   # single test
 uvx ruff check . && uvx ruff format --check .                 # lint (config in pyproject.toml)
 uvx bump-my-version bump patch         # version bump — touches 7 files, see [tool.bumpversion]
 uv run --extra docs mkdocs serve       # docs preview
 ```
+
+`-n auto` requires the installation of pytest-xdist, and will parallelise test executions.
 
 One container for every process, built locally, not pulled (`params.container` in `nextflow.config`).
 It carries the Python package, bcftools/htslib, echtvar and SVAFotate; only GATK SVAnnotate runs
