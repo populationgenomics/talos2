@@ -1,0 +1,54 @@
+{
+    "project": {
+        "participants": [
+            {
+                "samples": [
+                    {
+                        "sequencingGroups": [
+                            {
+                                "id": "CPT11"
+                            }
+                        ]
+                    }
+                ],
+                "externalId": "FAM1_father"
+            },
+            {
+                "samples": [
+                    {
+                        "sequencingGroups": [
+                            {
+                                "id": "CPT12"
+                            }
+                        ]
+                    }
+                ],
+                "externalId": "FAM1_mother"
+            },
+            {
+                "samples": [
+                    {
+                        "sequencingGroups": [
+                            {
+                                "id": "CPT13"
+                            }
+                        ]
+                    }
+                ],
+                "externalId": "FAM1_proband"
+            },
+            {
+                "samples": [
+                    {
+                        "sequencingGroups": [
+                            {
+                                "id": "CPT41"
+                            }
+                        ]
+                    }
+                ],
+                "externalId": "FAM2_proband"
+            }
+        ]
+    }
+}

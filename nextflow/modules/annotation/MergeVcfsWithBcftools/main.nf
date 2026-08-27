@@ -1,0 +1,30 @@
+process MergeVcfsWithBcftools {
+    container params.container
+
+    input:
+        tuple val(cohort), path(vcfs), path(tbis)
+        path ref_genome
+
+    output:
+        tuple val(cohort), path("${cohort}_merged.vcf.bgz"), path("${cohort}_merged.vcf.bgz.tbi")
+
+    script:
+        def input = (vcfs.collect().size() > 1) ? vcfs.sort{ it.name } : vcfs
+        """
+        set -euo pipefail
+
+        # https://github.com/samtools/bcftools/issues/1189
+        # "-m none" means don't merge multi-allelic sites, keep everything atomic, we're splitting in the next step
+        # -0 to set all missing genotypes to HomWT - gap-filling with Missing (default) reduces the AN, so callset
+        # frequency filters can appear to show an inflated AC/AN ratio
+        bcftools merge \
+        	--force-single \
+        	-m none \
+        	-0 \
+        	-Oz \
+        	--no-version \
+        	-o "${cohort}_merged.vcf.bgz" \
+        	-W=tbi \
+        	$input
+        """
+}

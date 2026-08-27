@@ -1,0 +1,12 @@
+test
+build
+.pytest*
+.github
+.coverage*
+.nextflow
+.idea
+
+large_files*
+nextflow/*_outputs
+nextflow/*test
+work

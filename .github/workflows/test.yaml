@@ -1,0 +1,29 @@
+name: CI_test
+
+on: [pull_request]
+
+# only run tests once in the event of multiple pushes in quick succession
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install packages
+      run: |
+        pip install ".[test]"
+
+    - name: test
+      run: pytest -n auto .
