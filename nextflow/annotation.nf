@@ -69,15 +69,17 @@ workflow ANNOTATION {
     // skip annotation entirely for cohorts whose shard manifest already exists - reuse the
     // published shards instead. Annotation is expensive and its inputs stable; delete the
     // cohort's `${cohort}_annotated` directory to force re-annotation
-    def annotated_root = params.annotated_dir ?: workflow.outputDir
+    // keep this a Path and resolve() against it - interpolating a cloud Path into a string
+    // drops the gs:// scheme, so the exists() check silently ran against the local filesystem
+    def annotated_root = file(params.annotated_dir ?: workflow.outputDir)
     ch_reuse_branched = ch_inputs.branch { row ->
-        complete: file("${annotated_root}/${row[0]}_annotated/${row[0]}_manifest.json").exists()
+        complete: annotated_root.resolve("${row[0]}_annotated").resolve("${row[0]}_manifest.json").exists()
         pending:  true
     }
 
     ch_complete_shards = ch_reuse_branched.complete.flatMap { row ->
         def cohort = row[0]
-        def dir = file("${annotated_root}/${cohort}_annotated")
+        def dir = annotated_root.resolve("${cohort}_annotated")
         def manifest = dir.resolve("${cohort}_manifest.json")
         println "Annotated shards for ${cohort} already exist (${manifest}), skipping annotation"
         shardsFromManifest(cohort, dir, manifest, row[1])
