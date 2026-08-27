@@ -31,8 +31,3 @@ repos:
     hooks:
       - id: mypy
         args: [--pretty, --show-error-codes, --install-types, --non-interactive]
-
-  - repo: https://github.com/seqeralabs/nf-lint-pre-commit
-    rev: v0.3.0
-    hooks:
-      - id: nextflow-lint
