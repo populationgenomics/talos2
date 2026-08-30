@@ -171,10 +171,15 @@ def probe_csq_arity(reader: VCF, csq_fields: list[str], vcf_path: str):
         if rows >= CSQ_PROBE_ROWS:
             break
 
+    # Due to the new fragmentation method, it's possible for one or more VCF fragments to contain no variants.
+    # If any fragments contain no variants, they're likely to reach this method as the first shard, guaranteeing failure
+    # This has been switched from a Error-mode failure, to a warning log message. The rest of the VCF INFO/Header checks
+    # are still present for some gatekeeping, and I expect downstream failure.
+    # Given the Talos2-ownership of the annotation pipeline, the value of this startup check is no longer clear.
     if not rows:
-        LOG_ERRORS.append(f'VCF contains no variants: {vcf_path}')
+        logger.warning(f'VCF contains no variants: {vcf_path}. Checking was incomplete.')
     elif not rows_with_bcsq:
-        LOG_ERRORS.append(f'None of the first {rows} variants in {vcf_path} carry a BCSQ annotation')
+        logger.warning(f'None of the first {rows} variants in {vcf_path} carry a BCSQ annotation')
 
 
 def check_vcf(vcf_path: str, pedigree: PedigreeParser | None):
