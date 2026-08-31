@@ -11,7 +11,7 @@
 # image. Last verified 2026-08-26.
 ARG SVAFOTATE_COMMIT=30b5004a0f4d26959c6b9a82f165651585293626
 
-FROM python:3.11-slim-bullseye AS base
+FROM python:3.12-slim-trixie AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
