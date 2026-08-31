@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.0] - 2026-08
 
+* Every `main.nf` run now writes `talos_input_YYYYMMDD.tsv` to the root of the output directory - a copy of the run's input TSV with each cohort's `history` cell repointed at the results JSON that run published, ready to be reviewed and used as the `--input_tsv` for the next reanalysis cycle.
+* This aims to bridge the gap in the current implementation, where inputs and analysis outputs need to be manually updated for future cycles. Feel free to use this or ignore it :)
+
+[0.0.2] - 2026-08
+
+### Changed
+
+* Really reduces the per job resource requirements. This may be insufficient in HUGE cohorts, but has been successful in mid-sized (50-genome) testing. Users are invited to customise based on local requirements.
+
+### Fixed
+
+* Fixes the mechanism NextFlow uses to find adjacent-files, and carry out file globbing. This was fine for local deployments, but buggy in cloud environments due to String trimming.
+
+[0.0.1] - 2026-08
+
 ### Added
 
 * Welcome to the new repository! This is Talos 2.0, designed to be easier to deploy outside the CPG and Hail Batch-using sites. Instead of using Hail/Spark as a processing framework, this reimagined version uses a more basic map/reduce framework, scattering the input data as sharded VCFs, annotating and filtering in pieces, and re-forming a final VCF input from the minimal set of relevant variants. No Hail runtime, no MatrixTables, no Spark cluster. Just VCFs. This feels like a good compromise given the considerations - this needs to remain site-agnostic, making few assumptions about available infrastructure, but needs to run relatively quickly across cohorts of all sizes. This will still present scaling issues at super-high cohort sizes, but it represents dramatic improvements over the original Talos implementation at non-Spark enabled sites.

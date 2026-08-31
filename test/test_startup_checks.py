@@ -114,15 +114,15 @@ def test_truncated_bcsq_is_accepted(tmp_path):
     assert not startup_checks.LOG_ERRORS
 
 
-def test_empty_vcf_is_reported(tmp_path):
+def test_empty_vcf_is_reported(tmp_path, caplog):
     check_vcf(write_annotated_vcf(tmp_path, rows=[]), write_pedigree(tmp_path))
-    assert any('contains no variants' in error for error in startup_checks.LOG_ERRORS)
+    assert 'contains no variants' in caplog.text
 
 
-def test_rows_without_bcsq_are_reported(tmp_path):
+def test_rows_without_bcsq_are_reported(tmp_path, caplog):
     row = f'chr1\t12345\t.\tA\tG\t60\tPASS\t{BASE_INFO}\tGT\t0/1\t0/1\t0/1'
     check_vcf(write_annotated_vcf(tmp_path, rows=[row]), write_pedigree(tmp_path))
-    assert any('carry a BCSQ annotation' in error for error in startup_checks.LOG_ERRORS)
+    assert 'carry a BCSQ annotation' in caplog.text
 
 
 def test_pedigree_with_no_shared_samples_is_reported(tmp_path):
