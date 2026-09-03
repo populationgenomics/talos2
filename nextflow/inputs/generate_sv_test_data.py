@@ -149,6 +149,17 @@ VARIANTS = [
         alt='N]chr1:38875000]',
         extra_info={'CHR2': 'chr1', 'END2': '38875000'},
     ),
+    # an exonic breakend, should be caught by the new category
+    SV(
+        identifier='bnd_2',
+        pos=1509089,
+        end=1509090,
+        svtype='BND',
+        svlen=-1,
+        genotypes=['0/1', '0/0', '0/0'],
+        callset_af=0.0001,
+        extra_info={'CHR2': 'chr1', 'END2': '1533983'},
+    ),
 ]
 
 
