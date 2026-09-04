@@ -27,6 +27,10 @@ from talos2.vcf_streaming import (
 
 GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4.1')
 
+OUTPUT_FILTER_FIELDS = [
+    {'ID': 'UNRESOLVED', 'Description': 'Variant is unresolved'},
+]
+
 # INFO fields written to the labelled output, in order, as (ID, Number, Type)
 OUTPUT_INFO_FIELDS = [
     ('AC', 'A', 'Integer'),
@@ -73,8 +77,8 @@ def rearrange_annotations(
         a new dict of the curated annotations
     """
 
-    predicted_lof = info['PREDICTED_LOF']
-    predicted_bnd = info['PREDICTED_BREAKEND_EXONIC']
+    predicted_lof = info.get('PREDICTED_LOF', [])
+    predicted_bnd = info.get('PREDICTED_BREAKEND_EXONIC', [])
     lof = set(predicted_lof.split(',')) if isinstance(predicted_lof, str) else set(predicted_lof)
     bnd = set(predicted_bnd.split(',')) if isinstance(predicted_bnd, str) else set(predicted_bnd)
 
@@ -107,7 +111,7 @@ def rearrange_annotations(
         # match the symbols to gene IDs; unmapped symbols pass through unchanged
         'lof_ensg': {gene_mapping.get(gene, gene) for gene in lof},
         'bnd_ensg': {gene_mapping.get(gene, gene) for gene in bnd},
-        'gene_id': {gene_mapping.get(gene, gene) for gene in lof & bnd},
+        'gene_id': {gene_mapping.get(gene, gene) for gene in lof | bnd},
     }
 
 
@@ -162,6 +166,8 @@ def prepare_output_header(reader: VCF) -> bool:
         whether this callset spells the per-sex frequencies AF_MALE/AF_FEMALE
         (a header-level property) instead of MALE_AF/FEMALE_AF
     """
+    for filter_dict in OUTPUT_FILTER_FIELDS:
+        reader.add_filter_to_header(filter_dict)
     for field_id, number, field_type in OUTPUT_INFO_FIELDS:
         if not header_has_field(reader, field_id):
             reader.add_info_to_header(
@@ -282,6 +288,7 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
         # replace the raw INFO fields with the curated set
         for key in raw_info:
             del variant.INFO[key]
+
         for field_id, _number, _type in OUTPUT_INFO_FIELDS:
             value = info.get(field_id)
             if value is None:

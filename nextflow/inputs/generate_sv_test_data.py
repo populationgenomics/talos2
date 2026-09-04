@@ -31,6 +31,7 @@ HEADER = """\
 ##fileformat=VCFv4.2
 ##contig=<ID=chr1,length=248956422>
 ##ALT=<ID=DEL,Description="Deletion">
+##FILTER=<ID=UNRESOLVED,Description="Variant is unresolved">
 ##ALT=<ID=DUP,Description="Duplication">
 ##ALT=<ID=INS,Description="Insertion">
 ##ALT=<ID=INV,Description="Inversion">
