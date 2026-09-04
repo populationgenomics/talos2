@@ -125,7 +125,7 @@ def is_pathogenic(significance: str) -> bool:
 
 def variant_is_pass(variant: 'cyvcf2.Variant') -> bool:
     """cyvcf2 represents PASS/empty FILTER as None."""
-    return variant.FILTER is None
+    return variant.FILTER is None or (variant.INFO.get('SVTYPE') == 'BND' and variant.FILTERS == ['UNRESOLVED'])
 
 
 def first_value(value: Any) -> Any:

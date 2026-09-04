@@ -75,6 +75,10 @@ class SV:
     # only set for breakends
     alt: str | None = None
     extra_info: dict[str, str] = field(default_factory=dict)
+    filter: list[str] = field(default_factory=list)
+
+    if not filter:
+        filter = ['PASS']
 
     def info(self) -> str:
         """build the INFO column, expanding the joint-call frequency into the fields Talos reads"""
@@ -101,7 +105,9 @@ class SV:
     def as_row(self) -> str:
         """render as a VCF data line"""
         alt = self.alt or f'<{self.svtype}>'
-        columns = ['chr1', self.pos, self.identifier, 'N', alt, '.', 'PASS', self.info(), 'GT', *self.genotypes]
+        filter_list = self.filter or ['PASS']
+        filter_string = ','.join(filter_list)
+        columns = ['chr1', self.pos, self.identifier, 'N', alt, '.', filter_string, self.info(), 'GT', *self.genotypes]
         return '\t'.join(str(column) for column in columns)
 
 
@@ -159,6 +165,7 @@ VARIANTS = [
         genotypes=['0/1', '0/0', '0/0'],
         callset_af=0.0001,
         extra_info={'CHR2': 'chr1', 'END2': '1533983'},
+        filter=['UNRESOLVED']
     ),
 ]
 
