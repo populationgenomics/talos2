@@ -27,6 +27,10 @@ from talos2.vcf_streaming import (
 
 GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4.1')
 
+OUTPUT_FILTER_FIELDS = [
+    {'ID': 'UNRESOLVED', 'Description': 'Variant is unresolved'},
+]
+
 # INFO fields written to the labelled output, in order, as (ID, Number, Type)
 OUTPUT_INFO_FIELDS = [
     ('AC', 'A', 'Integer'),
@@ -35,6 +39,7 @@ OUTPUT_INFO_FIELDS = [
     ('algorithms', '.', 'String'),
     ('gnomad_sv_ID', '1', 'String'),
     ('gnomad_sv_AF', '1', 'Float'),
+    ('bnd', '.', 'String'),
     ('lof', '.', 'String'),
     ('n_het', '1', 'Integer'),
     ('n_homalt', '1', 'Integer'),
@@ -46,9 +51,11 @@ OUTPUT_INFO_FIELDS = [
     ('end2', '1', 'Integer'),
     ('male_af', 'A', 'Float'),
     ('female_af', 'A', 'Float'),
+    ('bnd_ensg', '.', 'String'),
     ('lof_ensg', '.', 'String'),
     ('gene_id', '1', 'String'),
     ('categorybooleansv1', '1', 'Integer'),
+    ('categorybooleanbnd', '1', 'Integer'),
 ]
 
 
@@ -70,8 +77,10 @@ def rearrange_annotations(
         a new dict of the curated annotations
     """
 
-    predicted_lof = info['PREDICTED_LOF']
+    predicted_lof = info.get('PREDICTED_LOF', [])
+    predicted_bnd = info.get('PREDICTED_BREAKEND_EXONIC', [])
     lof = set(predicted_lof.split(',')) if isinstance(predicted_lof, str) else set(predicted_lof)
+    bnd = set(predicted_bnd.split(',')) if isinstance(predicted_bnd, str) else set(predicted_bnd)
 
     # trying to sustain backwards compatibility with a changing GATK-SV/gCNV pipeline combination
     if uses_af_male_spelling:
@@ -88,6 +97,7 @@ def rearrange_annotations(
         'gnomad_sv_ID': info.get(f'{GNOMAD_POP}_sv_SVID'),
         'gnomad_sv_AF': info.get(f'{GNOMAD_POP}_sv_AF', 0.0),
         'lof': lof,
+        'bnd': bnd,
         'n_het': info['N_HET'],
         'n_homalt': info['N_HOMALT'],
         'svlen': info['SVLEN'],
@@ -100,7 +110,8 @@ def rearrange_annotations(
         'female_af': female_af,
         # match the symbols to gene IDs; unmapped symbols pass through unchanged
         'lof_ensg': {gene_mapping.get(gene, gene) for gene in lof},
-        'gene_id': {gene_mapping.get(gene, gene) for gene in lof},
+        'bnd_ensg': {gene_mapping.get(gene, gene) for gene in bnd},
+        'gene_id': {gene_mapping.get(gene, gene) for gene in lof | bnd},
     }
 
 
@@ -155,6 +166,8 @@ def prepare_output_header(reader: VCF) -> bool:
         whether this callset spells the per-sex frequencies AF_MALE/AF_FEMALE
         (a header-level property) instead of MALE_AF/FEMALE_AF
     """
+    for filter_dict in OUTPUT_FILTER_FIELDS:
+        reader.add_filter_to_header(filter_dict)
     for field_id, number, field_type in OUTPUT_INFO_FIELDS:
         if not header_has_field(reader, field_id):
             reader.add_info_to_header(
@@ -252,7 +265,7 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
             continue
 
         # drop rows with no LOF consequences
-        if not variant.INFO.get('PREDICTED_LOF'):
+        if not (variant.INFO.get('PREDICTED_LOF') or variant.INFO.get('PREDICTED_BREAKEND_EXONIC')):
             continue
 
         raw_info = dict(variant.INFO)
@@ -275,6 +288,7 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
         # replace the raw INFO fields with the curated set
         for key in raw_info:
             del variant.INFO[key]
+
         for field_id, _number, _type in OUTPUT_INFO_FIELDS:
             value = info.get(field_id)
             if value is None:
@@ -282,7 +296,11 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
             if isinstance(value, set):
                 value = ','.join(sorted(value))
             variant.INFO[field_id] = value
-        variant.INFO['categorybooleansv1'] = 1
+
+        # tried and tested - SVs predicted to cause LOF by SvAnnotate
+        variant.INFO['categorybooleansv1'] = 1 if variant.INFO['lof'] else 0
+        # second category introduced - exonic breakends
+        variant.INFO['categorybooleanbnd'] = 1 if variant.INFO['bnd'] else 0
 
         # VCF export doesn't handle hemizygous calls - recast haploid GTs as biallelic
         new_genotypes, modified = diploidise_genotypes(variant.genotypes)
