@@ -5,7 +5,7 @@
 # was python < 3.12
 # As a result SVAFotate has been forked and rewritten, we install that version.
 #
-# build with "docker build -t talos2:0.1.0 ."
+# build with "docker build -t talos2:0.2.0 ."
 
 FROM python:3.12-slim-trixie AS base
 
@@ -56,7 +56,7 @@ COPY --from=compiler /bcftools_install/usr/local/bin/* /usr/local/bin/
 COPY --from=compiler /bcftools_install/usr/local/libexec/bcftools/* /usr/local/libexec/bcftools/
 
 ARG ECHTVAR_VERSION=v0.2.2
-ENV VERSION=0.1.0
+ENV VERSION=0.2.0
 
 RUN wget -q -O /bin/echtvar "https://github.com/brentp/echtvar/releases/download/${ECHTVAR_VERSION}/echtvar" && \
     chmod +x /bin/echtvar
