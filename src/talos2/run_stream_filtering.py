@@ -78,10 +78,9 @@ PAR_REGIONS = {
 
 # raw INFO names written by the gnomAD echtvar zip, and the names Talos reads downstream
 GNOMAD_SOURCE_FIELDS = {
-    'gnomad_AC': 'gnomad_AC_joint',
-    'gnomad_AF': 'gnomad_AF_joint',
-    'gnomad_AC_XY': 'gnomad_AC_joint_XY',
-    'gnomad_HomAlt': 'gnomad_HomAlt_joint',
+    'gnomad_AC',
+    'gnomad_AF',
+    'gnomad_HomAlt',
 }
 
 # per-transcript AlphaMissense INFO fields, folded into the csq string then dropped
@@ -109,7 +108,6 @@ NEW_INFO_HEADERS = [
     {'ID': 'categorydetailspm5', 'Number': '1', 'Type': 'String', 'Description': 'ClinVar alleles at this codon'},
     {'ID': 'gnomad_AC', 'Number': '1', 'Type': 'Integer', 'Description': 'gnomAD joint AC'},
     {'ID': 'gnomad_AF', 'Number': '1', 'Type': 'Float', 'Description': 'gnomAD joint AF'},
-    {'ID': 'gnomad_AC_XY', 'Number': '1', 'Type': 'Integer', 'Description': 'gnomAD joint AC XY'},
     {'ID': 'gnomad_HomAlt', 'Number': '1', 'Type': 'Integer', 'Description': 'gnomAD joint Hom-Alt count'},
     {'ID': 'gene_id', 'Number': '1', 'Type': 'String', 'Description': 'Green gene this row is labelled against'},
 ]
@@ -227,7 +225,7 @@ def check_frequency_fields(reader: VCF) -> bool:
 
 def require_gnomad_fields(reader: VCF):
     """The gnomAD echtvar annotations are a hard requirement, matching the Hail schema access."""
-    if missing := [src for src in GNOMAD_SOURCE_FIELDS.values() if not header_has_field(reader, src)]:
+    if missing := [src for src in GNOMAD_SOURCE_FIELDS if not header_has_field(reader, src)]:
         raise ValueError(f'Required gnomAD INFO fields are missing from this VCF: {missing}')
 
 
@@ -528,9 +526,9 @@ def prepare_output_header(reader: VCF):
 
 
 def scrub_raw_info(variant: Variant):
-    """Remove the INFO fields we re-shape: BCSQ, raw gnomAD names, and per-transcript AlphaMissense."""
+    """Remove the INFO fields we re-shape: BCSQ, and per-transcript AlphaMissense."""
     for key in [key for key, _value in variant.INFO]:
-        if key == 'BCSQ' or key.startswith('gnomad_') or key in AM_INFO_FIELDS:
+        if key == 'BCSQ' or key in AM_INFO_FIELDS:
             del variant.INFO[key]
 
 
@@ -604,7 +602,7 @@ def label_variant(variant: Variant, ctx: StreamingContext) -> int:
         return 0
     clinvar_talos = int(is_pathogenic(significance))
 
-    gnomad_af = variant.INFO.get(GNOMAD_SOURCE_FIELDS['gnomad_AF'])
+    gnomad_af = variant.INFO.get('gnomad_AF')
     if not (
         passes_population_rare(gnomad_af, clinvar_talos, ctx.af_semi_rare)
         and (variant_is_pass(variant) or clinvar_talos)
@@ -625,14 +623,11 @@ def label_variant(variant: Variant, ctx: StreamingContext) -> int:
 
     base_flags = clinvar_category_flags(significance, stars, gene_ids, ctx.new_genes)
 
-    # take the renamed gnomAD values before scrubbing the raw fields
-    gnomad_values = {new: variant.INFO.get(src) or 0 for new, src in GNOMAD_SOURCE_FIELDS.items()}
+    # scrub the BCSQ and per-transcript alphamissense
     scrub_raw_info(variant)
     variant.INFO['clinvar_significance'] = significance
     variant.INFO['clinvar_stars'] = stars
     variant.INFO['clinvar_allele'] = allele
-    for key, value in gnomad_values.items():
-        variant.INFO[key] = value
 
     return write_gene_rows(variant, ctx, consequences, green_hits, base_flags)
 

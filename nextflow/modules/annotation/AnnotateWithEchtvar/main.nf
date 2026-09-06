@@ -16,7 +16,7 @@ process AnnotateWithEchtvar {
         echtvar anno \
             -e ${gnomad_zip} \
             -e ${am_zip} \
-            -i "gnomad_AF_joint < 0.05" \
+            -i "gnomad_AF < 0.05" \
             ${vcf} \
             "${vcf.simpleName}_echtvar.vcf.bgz"
         tabix "${vcf.simpleName}_echtvar.vcf.bgz"

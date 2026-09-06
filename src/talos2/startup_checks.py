@@ -27,7 +27,7 @@ REQUIRED_INFO_FIELDS: dict[str, str] = {
     'AC': 'bcftools +fill-tags, in NormaliseVcf',
     'AN': 'bcftools +fill-tags, in NormaliseVcf',
     'BCSQ': 'bcftools csq, in AnnotateCsqWithBcftools',
-    **dict.fromkeys(GNOMAD_SOURCE_FIELDS.values(), 'the gnomAD echtvar zip, in AnnotateWithEchtvar'),
+    **dict.fromkeys(GNOMAD_SOURCE_FIELDS, 'the gnomAD echtvar zip, in AnnotateWithEchtvar'),
 }
 
 # BCSQ fields read from every consequence - the rest of the csq string is derived after the split

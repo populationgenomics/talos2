@@ -83,6 +83,8 @@ class GlobalFilter:
         # check against each small-variant filter
         if isinstance(variant, SmallVariant):
             for key, threshold in self.small_dict.items():
+                if variant.info[key] is None:
+                    continue
                 if key in variant.info and variant.info[key] > threshold:
                     ex_logger.record(
                         variant=variant,
@@ -218,6 +220,8 @@ class DominantFilter:
         # check against each small-variant filter
         if isinstance(variant, SmallVariant):
             for key, threshold in self.small_dict.items():
+                if variant.info[key] is None:
+                    continue
                 if key in variant.info and variant.info[key] > threshold:
                     ex_logger.record(
                         variant=variant,

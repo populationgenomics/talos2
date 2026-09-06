@@ -18,14 +18,13 @@ BCSQ_HEADER_LINE = (
 INFO_HEADER_LINES = {
     'AC': '##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count">',
     'AN': '##INFO=<ID=AN,Number=1,Type=Integer,Description="Allele number">',
-    'gnomad_AC_joint': '##INFO=<ID=gnomad_AC_joint,Number=1,Type=Integer,Description="gnomAD AC">',
-    'gnomad_AF_joint': '##INFO=<ID=gnomad_AF_joint,Number=1,Type=Float,Description="gnomAD AF">',
-    'gnomad_AC_joint_XY': '##INFO=<ID=gnomad_AC_joint_XY,Number=1,Type=Integer,Description="gnomAD AC XY">',
-    'gnomad_HomAlt_joint': '##INFO=<ID=gnomad_HomAlt_joint,Number=1,Type=Integer,Description="gnomAD HomAlt">',
+    'gnomad_AC': '##INFO=<ID=gnomad_AC,Number=1,Type=Integer,Description="gnomAD AC">',
+    'gnomad_AF': '##INFO=<ID=gnomad_AF,Number=1,Type=Float,Description="gnomAD AF">',
+    'gnomad_HomAlt': '##INFO=<ID=gnomad_HomAlt,Number=1,Type=Integer,Description="gnomAD HomAlt">',
 }
 
 BCSQ_ENTRY = 'missense|GENE1|ENST01|protein_coding|+|123P|456A>G'
-BASE_INFO = 'AC=1;AN=6;gnomad_AC_joint=1;gnomad_AF_joint=0.0001;gnomad_AC_joint_XY=0;gnomad_HomAlt_joint=0'
+BASE_INFO = 'AC=1;AN=6;gnomad_AC=1;gnomad_AF=0.0001;gnomad_AC=0;gnomad_HomAlt=0'
 
 CLINVAR_INFO_LINES = (
     '##INFO=<ID=allele_id,Number=1,Type=Integer,Description="ClinVar Allele ID">\n'
@@ -88,7 +87,7 @@ def test_complete_vcf_passes(tmp_path):
     assert not startup_checks.LOG_ERRORS
 
 
-@pytest.mark.parametrize('missing_field', ['AC', 'AN', 'gnomad_AF_joint', 'gnomad_HomAlt_joint'])
+@pytest.mark.parametrize('missing_field', ['AC', 'AN', 'gnomad_AF', 'gnomad_HomAlt'])
 def test_missing_info_field_is_reported(tmp_path, missing_field):
     check_vcf(write_annotated_vcf(tmp_path, drop_info=(missing_field,)), write_pedigree(tmp_path))
     assert any(f'INFO/{missing_field} is missing' in error for error in startup_checks.LOG_ERRORS)
