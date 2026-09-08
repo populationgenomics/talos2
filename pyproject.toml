@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name='talos2'
 description='Centre for Population Genomics Variant Prioritisation'
 readme = "README.md"
-version="0.1.0"
+version="0.2.0"
 
 # pinned below python 3.13 for compatibility with semsimian
 requires-python = ">=3.10,<3.13"
@@ -34,6 +34,7 @@ dependencies=[
     'mendelbrot>=0.0.3',
     'networkx>=3',
     'obonet>=1',
+    'pandas',
     'pendulum>=3.1.0',
     'pydantic>=2.5.2',
     'python-dateutil>=2',
@@ -59,6 +60,9 @@ docs = [
 stripy = [
     'pysam'
 ]
+sv = [
+    'svafotate-cpg@git+https://github.com/MattWellie/svafotate#egg=main'
+]
 
 [project.urls]
 Repository = "https://github.com/populationgenomics/talos"
@@ -68,6 +72,8 @@ packages = ["src/talos2"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [options]
 include_package_data = true
@@ -118,7 +124,7 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.per-file-ignores]
 
 [tool.bumpversion]
-current_version = "0.1.0"
+current_version = "0.2.0"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true

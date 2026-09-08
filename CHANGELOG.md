@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--changelog-start-->
 <!--latest-start-->
 
+[0.2.0] - 2026-08
+
+### Added
+
+* Adds a new category for BND variants occurring in Exons
+
 [0.1.0] - 2026-08
 
 * Every `main.nf` run now writes `talos_input_YYYYMMDD.tsv` to the root of the output directory - a copy of the run's input TSV with each cohort's `history` cell repointed at the results JSON that run published, ready to be reviewed and used as the `--input_tsv` for the next reanalysis cycle.
