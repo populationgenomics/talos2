@@ -27,7 +27,7 @@ REQUIRED_INFO_FIELDS: dict[str, str] = {
     'AC': 'bcftools +fill-tags, in NormaliseVcf',
     'AN': 'bcftools +fill-tags, in NormaliseVcf',
     'BCSQ': 'bcftools csq, in AnnotateCsqWithBcftools',
-    **dict.fromkeys(GNOMAD_SOURCE_FIELDS, 'the gnomAD echtvar zip, in AnnotateWithEchtvar'),
+    # **dict.fromkeys(GNOMAD_SOURCE_FIELDS, 'the gnomAD echtvar zip, in AnnotateWithEchtvar'),
 }
 
 # BCSQ fields read from every consequence - the rest of the csq string is derived after the split
@@ -205,6 +205,11 @@ def check_vcf(vcf_path: str, pedigree: PedigreeParser | None):
     for field, source in REQUIRED_INFO_FIELDS.items():
         if not header_has_field(reader, field):
             LOG_ERRORS.append(f'INFO/{field} is missing from {vcf_path}, expected from {source}')
+
+    for new_name, legacy_name in GNOMAD_SOURCE_FIELDS.items():
+        if not (header_has_field(reader, new_name) or header_has_field(reader, legacy_name)):
+            options = f'{legacy_name} or {new_name}'
+            LOG_ERRORS.append(f'INFO/{options} is missing from {vcf_path}, expected')
 
     if pedigree is not None:
         check_pedigree_overlap(reader, pedigree, vcf_path)

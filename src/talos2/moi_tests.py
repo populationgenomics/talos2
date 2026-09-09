@@ -222,7 +222,7 @@ class DominantFilter:
             for key, threshold in self.small_dict.items():
                 if variant.info[key] is None:
                     continue
-                if key in variant.info and variant.info[key] > threshold:
+                if variant.info.get(key) and variant.info[key] > threshold:
                     ex_logger.record(
                         variant=variant,
                         gene=gene,
@@ -253,7 +253,7 @@ class DominantFilter:
 
         elif isinstance(variant, StructuralVariant):
             for key, threshold in self.sv_dict.items():
-                if key in variant.info and variant.info[key] > threshold:
+                if variant.info.get(key) and variant.info[key] > threshold:
                     ex_logger.record(
                         variant=variant,
                         gene=gene,
@@ -324,7 +324,7 @@ class ClinVarFilter:
         gene = variant.info.get('gene_id') if isinstance(variant.info.get('gene_id'), str) else None
 
         for key, threshold in self.small_dict.items():
-            if key in variant.info and variant.info[key] > threshold:
+            if variant.info.get(key) and variant.info[key] > threshold:
                 ex_logger.record(
                     variant=variant,
                     gene=gene,
@@ -387,7 +387,7 @@ class ClinVarDominantFilter:
         gene = variant.info.get('gene_id') if isinstance(variant.info.get('gene_id'), str) else None
 
         for key, threshold in self.small_dict.items():
-            if key in variant.info and variant.info[key] > threshold:
+            if variant.info.get(key) and variant.info[key] > threshold:
                 ex_logger.record(
                     variant=variant,
                     gene=gene,

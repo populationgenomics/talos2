@@ -77,17 +77,10 @@ PAR_REGIONS = {
 }
 
 # raw INFO names written by the gnomAD echtvar zip, and the names Talos reads downstream
-GNOMAD_SOURCE_FIELDS = {
-    'gnomad_AC',
-    'gnomad_AF',
-    'gnomad_HomAlt',
-}
-
 # this shim normalises the gnomAD field names
 GNOMAD_SOURCE_FIELDS = {
     'gnomad_AC': 'gnomad_AC_joint',
     'gnomad_AF': 'gnomad_AF_joint',
-    'gnomad_AC_XY': 'gnomad_AC_joint_XY',
     'gnomad_HomAlt': 'gnomad_HomAlt_joint',
 }
 
@@ -245,6 +238,22 @@ def require_gnomad_fields(reader: VCF):
 
     if missing:
         raise ValueError(f'Required gnomAD INFO fields are missing from this VCF: {missing}')
+
+
+def read_gnomad_fields(variant: Variant) -> dict[str, int | float]:
+    """
+    Read the gnomAD INFO fields under whichever name this VCF carries, keyed by the normalised name.
+
+    cyvcf2's INFO object has no membership test (`key in variant.INFO` iterates (key, value) tuples and is
+    always False), so presence is detected via `.get()` returning None. Absent fields are treated as 0.
+    """
+    values: dict[str, int | float] = {}
+    for new_key, legacy_key in GNOMAD_SOURCE_FIELDS.items():
+        value = variant.INFO.get(new_key)
+        if value is None:
+            value = variant.INFO.get(legacy_key)
+        values[new_key] = 0 if value is None else value
+    return values
 
 
 def structure_consequences(
@@ -621,10 +630,7 @@ def label_variant(variant: Variant, ctx: StreamingContext) -> int:
     clinvar_talos = int(is_pathogenic(significance))
 
     # extract gnomAD fields, and rename them
-    gnomad_values = {
-        new_key: variant.INFO.get(new_key, 0) if new_key in variant.INFO else variant.INFO.get(legacy_key, 0)
-        for new_key, legacy_key in GNOMAD_SOURCE_FIELDS.items()
-    }
+    gnomad_values = read_gnomad_fields(variant)
 
     if not (
         passes_population_rare(gnomad_values['gnomad_AF'], clinvar_talos, ctx.af_semi_rare)
