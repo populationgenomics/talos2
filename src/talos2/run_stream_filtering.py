@@ -83,6 +83,15 @@ GNOMAD_SOURCE_FIELDS = {
     'gnomad_HomAlt',
 }
 
+# this shim normalises the gnomAD field names
+GNOMAD_SOURCE_FIELDS = {
+    'gnomad_AC': 'gnomad_AC_joint',
+    'gnomad_AF': 'gnomad_AF_joint',
+    'gnomad_AC_XY': 'gnomad_AC_joint_XY',
+    'gnomad_HomAlt': 'gnomad_HomAlt_joint',
+}
+
+
 # per-transcript AlphaMissense INFO fields, folded into the csq string then dropped
 AM_INFO_FIELDS = ('am_transcript', 'am_class', 'am_score')
 
@@ -225,7 +234,16 @@ def check_frequency_fields(reader: VCF) -> bool:
 
 def require_gnomad_fields(reader: VCF):
     """The gnomAD echtvar annotations are a hard requirement, matching the Hail schema access."""
-    if missing := [src for src in GNOMAD_SOURCE_FIELDS if not header_has_field(reader, src)]:
+
+    # the name of these fields changed recently, so check that at least one of the available options exists
+    missing: list[str] = []
+
+    for src1, src2 in GNOMAD_SOURCE_FIELDS.items():
+        if header_has_field(reader, src1) or header_has_field(reader, src2):
+            continue
+        missing.append(f'{src1} or {src2}')
+
+    if missing:
         raise ValueError(f'Required gnomAD INFO fields are missing from this VCF: {missing}')
 
 
@@ -528,7 +546,7 @@ def prepare_output_header(reader: VCF):
 def scrub_raw_info(variant: Variant):
     """Remove the INFO fields we re-shape: BCSQ, and per-transcript AlphaMissense."""
     for key in [key for key, _value in variant.INFO]:
-        if key == 'BCSQ' or key in AM_INFO_FIELDS:
+        if key == 'BCSQ' or key.startswith('gnomad_') or key in AM_INFO_FIELDS:
             del variant.INFO[key]
 
 
@@ -602,9 +620,14 @@ def label_variant(variant: Variant, ctx: StreamingContext) -> int:
         return 0
     clinvar_talos = int(is_pathogenic(significance))
 
-    gnomad_af = variant.INFO.get('gnomad_AF')
+    # extract gnomAD fields, and rename them
+    gnomad_values = {
+        new_key: variant.INFO.get(new_key, 0) if new_key in variant.INFO else variant.INFO.get(legacy_key, 0)
+        for new_key, legacy_key in GNOMAD_SOURCE_FIELDS.items()
+    }
+
     if not (
-        passes_population_rare(gnomad_af, clinvar_talos, ctx.af_semi_rare)
+        passes_population_rare(gnomad_values['gnomad_AF'], clinvar_talos, ctx.af_semi_rare)
         and (variant_is_pass(variant) or clinvar_talos)
     ):
         return 0
@@ -628,6 +651,9 @@ def label_variant(variant: Variant, ctx: StreamingContext) -> int:
     variant.INFO['clinvar_significance'] = significance
     variant.INFO['clinvar_stars'] = stars
     variant.INFO['clinvar_allele'] = allele
+
+    for key, value in gnomad_values.items():
+        variant.INFO[key] = value
 
     return write_gene_rows(variant, ctx, consequences, green_hits, base_flags)
 
