@@ -36,7 +36,6 @@ OUTPUT_INFO_HEADERS = [
     {'ID': 'categorybooleanclinvarplp', 'Number': '1', 'Type': 'Integer', 'Description': 'ClinVar P/LP, 1+ stars'},
     {'ID': 'gnomad_AC', 'Number': '1', 'Type': 'Integer', 'Description': 'gnomAD AC (unpopulated for mito)'},
     {'ID': 'gnomad_AF', 'Number': '1', 'Type': 'Float', 'Description': 'gnomAD AF (unpopulated for mito)'},
-    {'ID': 'gnomad_AC_XY', 'Number': '1', 'Type': 'Integer', 'Description': 'gnomAD AC XY (unpopulated for mito)'},
     {'ID': 'gnomad_HomAlt', 'Number': '1', 'Type': 'Integer', 'Description': 'gnomAD HomAlt (unpopulated for mito)'},
     {'ID': 'gene_id', 'Number': '1', 'Type': 'String', 'Description': 'Green gene this row is labelled against'},
     {'ID': 'csq', 'Number': '.', 'Type': 'String', 'Description': 'Talos-formatted transcript consequences'},
