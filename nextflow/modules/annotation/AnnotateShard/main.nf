@@ -55,7 +55,7 @@ process AnnotateShard {
             --no-version \
             ${full_bcf} | \
         bcftools view \
-            -e 'INFO/gnomad_AF >= 0.05' \
+            -e 'INFO/gnomad_AF_joint >= 0.05' \
             -Oz \
             --threads ${task.cpus} \
             --no-version \
