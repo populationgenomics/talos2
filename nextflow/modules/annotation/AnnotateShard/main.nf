@@ -46,7 +46,8 @@ process AnnotateShard {
         tabix "${name}_sites_csq.vcf.bgz"
 
         # -c INFO lifts every INFO field (and its header line) from the annotated sites onto the
-        # full-width records, then drop common variants
+        # full-width records, then drop common variants. This output is published and re-read every
+        # reanalysis cycle, so it keeps the default compression level - but compresses in parallel
         bcftools annotate \
             -a "${name}_sites_csq.vcf.bgz" \
             -c INFO \
@@ -56,6 +57,7 @@ process AnnotateShard {
         bcftools view \
             -e 'INFO/gnomad_AF >= 0.05' \
             -Oz \
+            --threads ${task.cpus} \
             --no-version \
             -o "${name}_csq.vcf.bgz" \
             -W=tbi

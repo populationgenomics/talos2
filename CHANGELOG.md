@@ -25,9 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * The gnomAD AF < 0.05 pre-filter has moved from echtvar's `-i` expression to a `bcftools view -e 'INFO/gnomad_AF >= 0.05'` on the annotated full-width shard. Variants absent from gnomAD (`gnomad_AF=0`) are retained exactly as before.
 * Annotated shards are now published with a `.tbi` index alongside. Existing `${cohort}_annotated` directories (without indexes) remain valid - the manifest still names the shards to reuse.
 
+* `NormaliseVcf` writes its full-width intermediate at the lightest BCF compression level with threaded deflate, and `AnnotateShard` compresses its output across `task.cpus` (now 2). Deflate was ~70% of the per-shard runtime.
+
 ### Removed
 
 * Annotated shards no longer carry a per-sample `FORMAT/BCSQ` bitmask. Nothing in Talos read it; `INFO/BCSQ` is unchanged.
+* `FORMAT/PL` is dropped from every shard during normalisation, and so is absent from the annotated and labelled VCFs. Talos never read it (only GT, GQ, DP, AD and the phasing fields), and it was the widest per-sample field - published shards shrink by roughly a fifth.
 
 [0.2.0] - 2026-08
 
