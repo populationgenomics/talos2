@@ -175,7 +175,7 @@ output {
 	// annotation products - undated, reused by every subsequent reanalysis cycle, and safe to
 	// delete wholesale to force re-annotation without touching any analysis results
 	annotated {
-		path { id, _vcf -> "${id}_annotated" }
+		path { id, _vcf, _tbi -> "${id}_annotated" }
 	}
 	annotated_manifest {
 		path { id, _manifest -> "${id}_annotated" }

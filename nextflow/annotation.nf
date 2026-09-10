@@ -8,15 +8,17 @@ This workflow is the annotation process for the Talos pipeline.
 It requires a single VCF, which can be single- or multi-sample. This is then annotated and reformatted for Talos.
 The specific annotations are:
 
-- gnomAD v4.1 frequencies and alphamissense annotations, applied to the joint VCF using echtvar
-- Transcript consequences, using BCFtools annotate
+- gnomAD v4.1 frequencies and alphamissense annotations, applied using echtvar
+- Transcript consequences, using bcftools csq
+
+Both run on a sites-only copy of each normalised shard (all samples dropped), and the resulting INFO
+fields are lifted back onto the full-width shard with bcftools annotate - see AnnotateShard.
 
 Everything here is cohort-agnostic and cacheable. Output is the annotated VCF shards themselves -
 MANE and ClinVar are applied in the per-run workflow, where the labelling happens.
 */
 
-include { AnnotateCsqWithBcftools } from './modules/annotation/AnnotateCsqWithBcftools/main'
-include { AnnotateWithEchtvar } from './modules/annotation/AnnotateWithEchtvar/main'
+include { AnnotateShard } from './modules/annotation/AnnotateShard/main'
 include { IndexVcf } from './modules/annotation/IndexVcf/main'
 include { MakeScatterRegions } from './modules/annotation/MakeScatterRegions/main'
 include { MergeVcfsWithBcftools } from './modules/annotation/MergeVcfsWithBcftools/main'
@@ -155,15 +157,13 @@ workflow ANNOTATION {
         ch_ref_genome,
     )
 
-	AnnotateWithEchtvar(
+    // echtvar + bcftools csq on the sites-only copy, INFO lifted onto the full-width shard.
+    // One process, not a chain: the channel is keyed by cohort only, so the full-width shard could
+    // not be joined back to its annotated sites downstream without threading a shard key throughout
+    AnnotateShard(
         NormaliseVcf.out,
         ch_gnomad_zip,
         ch_alphamissense_zip,
-    )
-
-    // annotate transcript consequences with bcftools csq
-    AnnotateCsqWithBcftools(
-        AnnotateWithEchtvar.out,
         ch_gff,
         ch_ref_genome,
     )
@@ -171,16 +171,17 @@ workflow ANNOTATION {
     // gather each cohort's shard names into a manifest, alongside the input identity and split
     // setting - the manifest existence check above reads this on the next run, and it names
     // exactly the shards to consume, so no directory globbing is ever needed
-    ch_shard_names = AnnotateCsqWithBcftools.out
-        .map { cohort, vcf -> tuple(cohort, vcf.name) }
+    ch_shard_names = AnnotateShard.out
+        .map { cohort, vcf, _tbi -> tuple(cohort, vcf.name) }
         .groupTuple(by: 0)
     WriteShardManifest(ch_shard_names.join(ch_reuse_branched.pending))
 
     emit:
-        // one entry per shard, as [cohort, vcf], newly annotated and reused alike - the per-run workflow keeps the scatter open
-    	shards = AnnotateCsqWithBcftools.out.mix(ch_complete_shards)
-        // newly annotated shards only - these need publishing, reused ones are already on disk
-        new_shards = AnnotateCsqWithBcftools.out
+        // one entry per shard, as [cohort, vcf], newly annotated and reused alike - the per-run workflow keeps the scatter open.
+        // The index is dropped here: the per-run workflow streams every shard whole, so it never needs one
+    	shards = AnnotateShard.out.map { cohort, vcf, _tbi -> tuple(cohort, vcf) }.mix(ch_complete_shards)
+        // newly annotated shards only, as [cohort, vcf, tbi] - these need publishing, reused ones are already on disk
+        new_shards = AnnotateShard.out
         // one entry per newly annotated cohort, as [cohort, manifest_json]
         manifest = WriteShardManifest.out
 }

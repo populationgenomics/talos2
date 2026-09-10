@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--changelog-start-->
 <!--latest-start-->
 
+[Unreleased]
+
+### Changed
+
+* The annotation workflow now runs echtvar and `bcftools csq` on a sites-only copy of each normalised shard (all samples dropped), then lifts the resulting INFO fields back onto the full-width shard with `bcftools annotate`. Only `bcftools norm`/`+fill-tags` and the final lift touch the genotype columns, so the per-shard cost no longer scales with cohort width for the annotation tools themselves. `AnnotateWithEchtvar` and `AnnotateCsqWithBcftools` are replaced by a single `AnnotateShard` process - update any `withName:` resource blocks accordingly.
+* The gnomAD AF < 0.05 pre-filter has moved from echtvar's `-i` expression to a `bcftools view -e 'INFO/gnomad_AF >= 0.05'` on the annotated full-width shard. Variants absent from gnomAD (`gnomad_AF=0`) are retained exactly as before.
+* Annotated shards are now published with a `.tbi` index alongside. Existing `${cohort}_annotated` directories (without indexes) remain valid - the manifest still names the shards to reuse.
+
+### Removed
+
+* Annotated shards no longer carry a per-sample `FORMAT/BCSQ` bitmask. Nothing in Talos read it; `INFO/BCSQ` is unchanged.
+
 [0.2.0] - 2026-08
 
 ### Added
