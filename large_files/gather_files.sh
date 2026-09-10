@@ -177,7 +177,7 @@ start_download https://github.com/obophenotype/human-phenotype-ontology/releases
 start_download https://github.com/obophenotype/human-phenotype-ontology/releases/download/v2026-02-16/genes_to_phenotype.txt
 
 # mitochondrial annotations
-start_download https://www.mitomap.org/downloads/mitotip_scores.txt
+start_download https://www.fr.mitomap.org/downloads/mitotip_scores.txt
 
 start_download "https://mitimpact.mcb2lab.org/cdn/nAPOGEE_v1.0.0.txt.zip"
 
