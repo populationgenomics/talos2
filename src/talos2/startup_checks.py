@@ -208,8 +208,7 @@ def check_vcf(vcf_path: str, pedigree: PedigreeParser | None):
 
     for new_name, legacy_name in GNOMAD_SOURCE_FIELDS.items():
         if not (header_has_field(reader, new_name) or header_has_field(reader, legacy_name)):
-            options = f'{legacy_name} or {new_name}'
-            LOG_ERRORS.append(f'INFO/{options} is missing from {vcf_path}, expected')
+            LOG_ERRORS.append(f'INFO/{new_name} is missing from {vcf_path}, expected')
 
     if pedigree is not None:
         check_pedigree_overlap(reader, pedigree, vcf_path)

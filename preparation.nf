@@ -176,7 +176,6 @@ workflow {
         panelapp_out = channel.fromPath(current_panelapp, checkIfExists: true)
     }
 
-    // use workflow outputs, not individual copies
     publish:
         alphamissense = ch_alphamissense_zip
         bed = ch_bed

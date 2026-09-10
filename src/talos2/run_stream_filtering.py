@@ -607,6 +607,7 @@ def write_gene_rows(
         if gene_csqs:
             variant.INFO['csq'] = consequences_to_csq_string(gene_csqs)
         variant.INFO['gene_id'] = gene_id
+        print(variant)
         ctx.writer.write_record(variant)
         written += 1
     return written
