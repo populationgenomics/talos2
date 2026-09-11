@@ -150,7 +150,6 @@ def main(
         variant.INFO['categorybooleanclinvarplp'] = 1
         variant.INFO['gnomad_AC'] = 0
         variant.INFO['gnomad_AF'] = 0.0
-        variant.INFO['gnomad_AC_XY'] = 0
         variant.INFO['gnomad_HomAlt'] = 0
         variant.INFO['csq'] = consequences_to_csq_string(consequences)
 
