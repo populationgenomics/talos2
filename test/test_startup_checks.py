@@ -57,7 +57,6 @@ def write_annotated_vcf(
     ]
     if with_bcsq_header:
         header_lines.append(BCSQ_HEADER_LINE)
-    print(header_lines)
 
     columns = '\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', *samples])
     gts = '\t'.join(['0/1'] * len(samples))
@@ -91,7 +90,6 @@ def test_complete_vcf_passes(tmp_path):
 @pytest.mark.parametrize('missing_field', ['AC', 'AN', 'gnomad_AF', 'gnomad_HomAlt'])
 def test_missing_info_field_is_reported(tmp_path, missing_field):
     check_vcf(write_annotated_vcf(tmp_path, drop_info=(missing_field,)), write_pedigree(tmp_path))
-    print(startup_checks.LOG_ERRORS)
     assert any(f'INFO/{missing_field} is missing' in error for error in startup_checks.LOG_ERRORS)
 
 
