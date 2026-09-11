@@ -593,7 +593,7 @@ class Variant:
         self.alt = report_variant.var_data.coordinates.alt
         self.change = self.get_var_change()
         self.categories = report_variant.categories
-        self.first_tagged: str = report_variant.first_tagged
+        self.evidence_updated: str = report_variant.evidence_last_updated
         self.support_vars = report_variant.support_vars
         self.warning_flags = report_variant.flags
         # these are the panel IDs which are matched based on HPO matching in PanelApp
@@ -623,6 +623,7 @@ class Variant:
         applied_panel_ids = match_ids | {html_builder.base_panel}
 
         self.max_confidence: int = report_variant.max_confidence
+
         # List of (gene_id, symbol, panel_confidence_tooltip_html)
         self.genes: list[tuple[str, str, str]] = []
         for gene_id in report_variant.gene.split(','):
