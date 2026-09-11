@@ -64,6 +64,8 @@ NEW_THRESHOLD = pendulum.now().subtract(months=WITHIN_X_MONTHS)
 EXPIRED_DOWNLOAD = pendulum.now().subtract(months=2)
 MOI_FOR_CUSTOM_GENES = 'Mono_And_Biallelic'
 CUSTOM_PANEL_ID = 0
+# genes on the custom panel are always treated as Green
+CUSTOM_PANEL_CONFIDENCE = 3
 
 
 def cli_main():
@@ -333,6 +335,7 @@ def update_moi_from_config(
             logger.info(f'From custom data: setting {ensg} MOI to {moi}')
             panelapp_data.genes[ensg].moi = moi
             panelapp_data.genes[ensg].panels.add(CUSTOM_PANEL_ID)
+            panelapp_data.genes[ensg].panel_confidences[CUSTOM_PANEL_ID] = CUSTOM_PANEL_CONFIDENCE
 
         else:
             # if this is a new gene, add it to the dictionary
@@ -341,6 +344,7 @@ def update_moi_from_config(
                 symbol=gene_data.get('symbol', f'Custom: {ensg}'),
                 moi=moi,
                 panels={CUSTOM_PANEL_ID},
+                panel_confidences={CUSTOM_PANEL_ID: CUSTOM_PANEL_CONFIDENCE},
                 chrom=gene_data.get('chrom', 'chrUnknown'),
                 location=gene_data.get('location', 'Unknown'),
             )
