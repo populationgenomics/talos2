@@ -973,7 +973,12 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             # we found this variant again, but do we have any new categories to add?
             new_var = new_vars[old_coord]
 
-            # collect all the dates we have for first category assignment
+            # categories seen before keep their original date, anything new is dated today
+            for cat, date in old_var.categories.items():
+                new_var.categories[translate_category(cat)] = date
+
+            # collect all the dates we have for first category assignment - this must follow the merge above,
+            # or every re-found category would contribute today's date
             category_dates = list(new_var.categories.values())
 
             if new_var.clinvar_stars:
@@ -982,9 +987,6 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
                 )
                 if new_var.clinvar_increase:
                     category_dates.append(get_granular_date())
-
-            for cat, date in old_var.categories.items():
-                new_var.categories[translate_category(cat)] = date
 
             # if the latest event has an upgraded panel confidence, today's date drives the discovery date
             # we always want to recognise a jump, e.g. Amber -> Green, with an updated date

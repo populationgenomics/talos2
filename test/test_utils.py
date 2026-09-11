@@ -10,9 +10,12 @@ from mendelbrot.pedigree_parser import PedigreeParser
 from talos2.models import (
     Coordinates,
     ReportVariant,
+    ResultData,
     SmallVariant,
 )
+from talos2.static_values import get_granular_date
 from talos2.utils import (
+    annotate_variant_dates_using_prior_results,
     find_comp_hets,
     gather_gene_dict_from_contig,
     get_non_ref_samples,
@@ -185,3 +188,89 @@ def test_phased_comp_hets(phased_variants: list[SmallVariant], pedigree_path: st
     """
     ch_dict = find_comp_hets(phased_variants, pedigree=PedigreeParser(pedigree_path))
     assert len(ch_dict) == ZERO_EXPECTED
+
+
+OLD_DATE = '2020-01-01'
+DATE_VAR = SmallVariant(
+    coordinates=Coordinates(chrom='1', pos=100, ref='A', alt='C'),
+    info={},
+    transcript_consequences=[],
+)
+
+
+def _single_variant_results(max_confidence: int, date: str, **kwargs: str | bool) -> ResultData:
+    """Build a ResultData with one sample carrying one variant, tagged with a single category on the given date."""
+    variant = ReportVariant(
+        sample='sam1',
+        var_data=DATE_VAR,
+        gene='ENSG1',
+        categories={'2': date},
+        max_confidence=max_confidence,
+        first_tagged=date,
+        evidence_last_updated=date,
+        **kwargs,
+    )
+    return ResultData(
+        results={'sam1': {'metadata': {'ext_id': 'sam1', 'family_id': 'fam1'}, 'variants': [variant]}},
+    )
+
+
+def test_annotate_dates_confidence_increase():
+    """A genuine jump in panel confidence flags the variant and re-dates the evidence to today."""
+    today = get_granular_date()
+    old = _single_variant_results(max_confidence=2, date=OLD_DATE)
+    new = _single_variant_results(max_confidence=3, date=today)
+
+    annotate_variant_dates_using_prior_results(new, old)
+
+    variant = new.results['sam1'].variants[0]
+    assert variant.confidence_increase
+    assert variant.evidence_last_updated == today
+    # the category itself was first seen in the old run, so first_tagged is preserved
+    assert variant.first_tagged == OLD_DATE
+
+
+def test_annotate_dates_confidence_placeholder_ignored():
+    """
+    -1 is the liftover placeholder for results which pre-date confidence tracking
+    it must not count as an increase, and must not short-circuit the rest of the date carry-forward
+    """
+    today = get_granular_date()
+    old = _single_variant_results(max_confidence=-1, date=OLD_DATE, date_of_phenotype_match=OLD_DATE)
+    new = _single_variant_results(max_confidence=3, date=today)
+
+    annotate_variant_dates_using_prior_results(new, old)
+
+    variant = new.results['sam1'].variants[0]
+    assert not variant.confidence_increase
+    assert variant.evidence_last_updated == OLD_DATE
+    assert variant.first_tagged == OLD_DATE
+    # this carry-forward sits after the confidence check, and was previously skipped for placeholder values
+    assert variant.date_of_phenotype_match == OLD_DATE
+
+
+def test_annotate_dates_confidence_unchanged_or_lower():
+    """Same or lower confidence is not an increase, and leaves the evidence date alone."""
+    today = get_granular_date()
+    for new_confidence in (3, 2):
+        old = _single_variant_results(max_confidence=3, date=OLD_DATE)
+        new = _single_variant_results(max_confidence=new_confidence, date=today)
+
+        annotate_variant_dates_using_prior_results(new, old)
+
+        variant = new.results['sam1'].variants[0]
+        assert not variant.confidence_increase
+        assert variant.evidence_last_updated == OLD_DATE
+
+
+def test_annotate_dates_confidence_reset_when_not_found():
+    """A variant absent from the current run is carried over, with any prior increase flag cleared."""
+    old = _single_variant_results(max_confidence=3, date=OLD_DATE, confidence_increase=True)
+    new = ResultData(results={'sam1': {'metadata': {'ext_id': 'sam1', 'family_id': 'fam1'}, 'variants': []}})
+
+    annotate_variant_dates_using_prior_results(new, old)
+
+    assert len(new.results['sam1'].variants) == ONE_EXPECTED
+    variant = new.results['sam1'].variants[0]
+    assert not variant.found_in_current_run
+    assert not variant.confidence_increase
