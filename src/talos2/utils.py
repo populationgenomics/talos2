@@ -985,6 +985,10 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             # if the latest event has an upgraded panel confidence, today's date drives the discovery date
             # we always want to recognise a jump, e.g. Amber -> Green, with an updated date
             if new_var.max_confidence > old_var.max_confidence:
+                # this represents missing data, not a real value
+                # placeholder during the upgrade
+                if old_var.max_confidence == -1:
+                    continue
                 category_dates.append(get_granular_date())
 
             # we previously had a phenotype match date, carry it forward
