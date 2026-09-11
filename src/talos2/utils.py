@@ -992,6 +992,7 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
                 # placeholder during the upgrade
                 if old_var.max_confidence == -1:
                     continue
+                new_var.clinvar_increase = True
                 category_dates.append(get_granular_date())
 
             # we previously had a phenotype match date, carry it forward

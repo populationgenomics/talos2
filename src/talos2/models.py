@@ -397,6 +397,8 @@ class ReportVariant(BaseModel):
 
     # this will be determined based on the specific panels applied to a participant
     max_confidence: int = Field(default_factory=int)
+    # log whether there was an increase in panel confidence since the last run
+    confidence_increase: bool = Field(default=False)
 
     def __eq__(self, other):
         """

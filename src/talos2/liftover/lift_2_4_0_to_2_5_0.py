@@ -8,5 +8,6 @@ def resultdata(data_dict: dict) -> dict:
         for var in res['variants']:
             # placeholder to represent that the last run did not record this stat
             var['max_confidence'] = -1
+            var['confidence_increase'] = False
     data_dict['version'] = '2.5.0'
     return data_dict
