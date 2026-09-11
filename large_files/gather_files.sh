@@ -136,10 +136,10 @@ await() {
 
 trap cleanup SIGINT SIGTERM
 
-# Echtvar-encoded gnomAD 4.1 population frequencies - this is a big one (~6GB) so it's started early and backgrounded
-ECHTVAR_FILE="gnomad_4.1_region_merged_GRCh38_whole_genome"
-start_download https://zenodo.org/records/15222100/files/gnomad_4.1_region_merged_GRCh38_whole_genome?download=1 "${ECHTVAR_FILE}" "\
-Downloading Echtvar from https://zenodo.org/records/15222100"
+# Echtvar-encoded gnomAD 4.1 population frequencies - this is a big one (~4GB)
+ECHTVAR_FILE="gnomad_4.1_22297079_GRCh38_whole_genome"
+start_download https://zenodo.org/records/22297079/files/gnomad_4.1_whole_genome.zip?download=1 "${ECHTVAR_FILE}" "\
+Downloading Echtvar from https://zenodo.org/records/22297079"
 
 # Monarch phenotype DB - another large download. 17GB decompressed
 COMPRESSED_PHENIO="phenio.db.gz"
@@ -177,7 +177,7 @@ start_download https://github.com/obophenotype/human-phenotype-ontology/releases
 start_download https://github.com/obophenotype/human-phenotype-ontology/releases/download/v2026-02-16/genes_to_phenotype.txt
 
 # mitochondrial annotations
-start_download https://www.mitomap.org/downloads/mitotip_scores.txt
+start_download https://www.fr.mitomap.org/downloads/mitotip_scores.txt
 
 start_download "https://mitimpact.mcb2lab.org/cdn/nAPOGEE_v1.0.0.txt.zip"
 

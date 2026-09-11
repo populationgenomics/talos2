@@ -76,10 +76,9 @@ VCF_HEADER = (
     '##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count">\n'
     '##INFO=<ID=AN,Number=1,Type=Integer,Description="Allele number">\n'
     '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele frequency">\n'
-    '##INFO=<ID=gnomad_AC_joint,Number=1,Type=Integer,Description="gnomAD AC">\n'
-    '##INFO=<ID=gnomad_AF_joint,Number=1,Type=Float,Description="gnomAD AF">\n'
-    '##INFO=<ID=gnomad_AC_joint_XY,Number=1,Type=Integer,Description="gnomAD AC XY">\n'
-    '##INFO=<ID=gnomad_HomAlt_joint,Number=1,Type=Integer,Description="gnomAD HomAlt">\n'
+    '##INFO=<ID=gnomad_AC,Number=1,Type=Integer,Description="gnomAD AC">\n'
+    '##INFO=<ID=gnomad_AF,Number=1,Type=Float,Description="gnomAD AF">\n'
+    '##INFO=<ID=gnomad_HomAlt,Number=1,Type=Integer,Description="gnomAD HomAlt">\n'
     '##INFO=<ID=clinvar_significance,Number=1,Type=String,Description="ClinvArbitration significance">\n'
     '##INFO=<ID=clinvar_stars,Number=1,Type=Integer,Description="ClinvArbitration stars">\n'
     '##INFO=<ID=clinvar_allele,Number=1,Type=Integer,Description="ClinvArbitration allele ID">\n'
@@ -93,7 +92,7 @@ VCF_HEADER = (
     '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tmale\tfather_1\tmother_1\n'
 )
 
-BASE_INFO = 'AC=1;AN=6;AF=0.001;gnomad_AC_joint=1;gnomad_AF_joint=0.0001;gnomad_AC_joint_XY=0;gnomad_HomAlt_joint=0'
+BASE_INFO = 'AC=1;AN=6;AF=0.001;gnomad_AC=1;gnomad_AF=0.0001;gnomad_HomAlt=0'
 PLP_INFO = 'clinvar_significance=Pathogenic/Likely_Pathogenic;clinvar_stars=1;clinvar_allele=25'
 
 TRIO_GTS = ('0/1:60:30', '0/0:60:30', '0/0:60:30')
@@ -502,7 +501,6 @@ def test_clinvar_plp_is_labelled_and_de_novo(tmp_path, monkeypatch):
 
     # BCSQ and the raw annotations were reshaped
     assert 'BCSQ' not in info
-    assert 'gnomad_AF_joint' not in info
     assert info['gnomad_AC'] == 1
     assert pytest.approx(info['gnomad_AF'], abs=1e-6) == 0.0001
 
@@ -557,7 +555,7 @@ def test_alphamissense_other_transcript_not_labelled(tmp_path, monkeypatch):
 
 
 def test_common_in_gnomad_dropped_unless_clinvar(tmp_path, monkeypatch):
-    common = BASE_INFO.replace('gnomad_AF_joint=0.0001', 'gnomad_AF_joint=0.05')
+    common = BASE_INFO.replace('gnomad_AF=0.0001', 'gnomad_AF=0.05')
     rows = [make_row(f'BCSQ={bcsq(consequence="frameshift")};{common}')]
     assert not run_streaming(tmp_path, monkeypatch, rows)
 
