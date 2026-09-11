@@ -966,21 +966,34 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
                 old_var.categories = {translate_category(key): val for key, val in old_var.categories.items()}
                 old_var.found_in_current_run = False
                 old_var.clinvar_increase = False
+                old_var.confidence_increase = False
                 content.variants.append(old_var)
                 continue
 
             # we found this variant again, but do we have any new categories to add?
             new_var = new_vars[old_coord]
+
+            # categories seen before keep their original date, anything new is dated today
+            for cat, date in old_var.categories.items():
+                new_var.categories[translate_category(cat)] = date
+
+            # collect all the dates we have for first category assignment - this must follow the merge above,
+            # or every re-found category would contribute today's date
+            category_dates = list(new_var.categories.values())
+
             if new_var.clinvar_stars:
                 new_var.clinvar_increase = bool(
                     old_var.clinvar_stars is None or new_var.clinvar_stars > old_var.clinvar_stars,
                 )
+                if new_var.clinvar_increase:
+                    category_dates.append(get_granular_date())
 
-            for cat, date in old_var.categories.items():
-                new_var.categories[translate_category(cat)] = date
-
-            # collect all the dates we have for first category assignment
-            category_dates = list(new_var.categories.values())
+            # if the latest event has an upgraded panel confidence, today's date drives the discovery date
+            # we always want to recognise a jump, e.g. Amber -> Green, with an updated date
+            if new_var.max_confidence > old_var.max_confidence != -1:
+                # this represents missing data, not a real value - placeholder during the upgrade
+                new_var.confidence_increase = True
+                category_dates.append(get_granular_date())
 
             # we previously had a phenotype match date, carry it forward
             if old_pheno := old_var.date_of_phenotype_match:
