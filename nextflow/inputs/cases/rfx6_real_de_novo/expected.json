@@ -1,0 +1,10 @@
+{
+  "case": "rfx6_real_de_novo",
+  "description": "real de novo missense in RFX6 (AR), the only case where nothing is injected",
+  "pedigree": "nextflow/inputs/pedigree_female_proband.ped",
+  "injected": [],
+  "background_variants": 151,
+  "expected": {
+    "proband": []
+  }
+}
