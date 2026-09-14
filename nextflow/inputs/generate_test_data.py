@@ -49,7 +49,7 @@ HEADER = """\
 ##INFO=<ID=AF,Number=.,Type=Float,Description="Allele frequency in the joint call">
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Allele number in the joint call">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the observed alleles">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the observed alleles">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
 ##FORMAT=<ID=PL,Number=.,Type=Integer,Description="Phred-scaled genotype likelihoods">
@@ -85,8 +85,9 @@ HET_CALL = Call('0/1', ad=[15, 15])
 HOM_CALL = Call('1/1', ad=[0, 30])
 HOMREF_CALL = Call('0/0', ad=[30, 0])
 MISSING_CALL = Call('.', ad=[-1])
-HEMI_VAR = Call('1', ad=[30])
-HEMI_REF = Call('0', ad=[30])
+# AD is Number=R - one value per allele regardless of ploidy, so haploid calls still carry a REF and an ALT depth
+HEMI_VAR = Call('1', ad=[0, 30])
+HEMI_REF = Call('0', ad=[30, 0])
 
 # --- shared genotype patterns from the trio, matching the deleted script's fixtures ---
 comp_het = {'proband': HOM_CALL, 'mother': HET_CALL, 'father': HET_CALL}
