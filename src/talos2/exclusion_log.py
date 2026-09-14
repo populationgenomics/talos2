@@ -50,7 +50,7 @@ class ExclusionLogger:
         reason: str,
         details: dict[str, Any] | None = None,
     ) -> None:
-        if self._handle is None:
+        if not self.path:
             return
         self._open()
         payload = {
