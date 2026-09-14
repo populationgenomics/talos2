@@ -50,6 +50,8 @@ class ExclusionLogger:
         reason: str,
         details: dict[str, Any] | None = None,
     ) -> None:
+        if self._handle is None:
+            return
         self._open()
         payload = {
             'variant': variant.coordinates.string_format if variant is not None else None,
@@ -60,7 +62,6 @@ class ExclusionLogger:
             'reason': reason,
             'details': details or {},
         }
-        assert self._handle is not None
         self._handle.write(json.dumps(payload) + '\n')
 
     def close(self) -> None:
