@@ -28,8 +28,8 @@ Steps:
   - change the SOURCE_VCF path to a real VCF
   - change the sample ID translation in TRIO to match your VCF's sample IDs, always converting to proband/mother/father
   - run test data generation script
-  - run main.nf on the resulting input.tsv
-  - run the evaluation script nextflow/inputs/cases/check_test_cases.py on the 'next-run' input TSV genreated by Talos
+  - run main.nf on the resulting multi_case_input.tsv
+  - run the evaluation script nextflow/inputs/check_test_cases.py on the 'next-run' input TSV genreated by Talos
 
 Script output will show successful and failing test cases, along with unexpected and/or missing test cases or categories
 """
@@ -76,7 +76,7 @@ HEADER = """\
 {contigs}
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the observed alleles">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the observed alleles">
 ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
 ##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phase set">
@@ -110,8 +110,9 @@ HET_CALL = Call('0/1', ad=[15, 15])
 HOM_CALL = Call('1/1', ad=[0, 30])
 HOMREF_CALL = Call('0/0', ad=[30, 0])
 MISSING_CALL = Call('.', ad=[-1])
-HEMI_VAR = Call('1', ad=[30])
-HEMI_REF = Call('0', ad=[30])
+# AD is Number=R - one value per allele regardless of ploidy, so haploid calls still carry a REF and an ALT depth
+HEMI_VAR = Call('1', ad=[0, 30])
+HEMI_REF = Call('0', ad=[30, 0])
 
 # --- shared genotype patterns for the trio ---
 hom_recessive = {'proband': HOM_CALL, 'mother': HET_CALL, 'father': HET_CALL}
@@ -250,7 +251,7 @@ CASES = [
                 ['AlphaMissense', 'ClinVar P/LP', 'PM5'],
                 support_vars=['chr2-135912503-G-A'],
             ),
-            Expected('chr2-135912503-G-A', 'DARS1', ['AlphaMissense'], support_vars=['chr2-135920591-G-C''chr2-135912503-G-A']),
+            Expected('chr2-135912503-G-A', 'DARS1', ['AlphaMissense'], support_vars=['chr2-135920591-G-C']),
         ],
     ),
     Case(
@@ -431,14 +432,15 @@ def write_expected(case: Case, case_dir: Path, n_background: int) -> None:
     (case_dir / 'expected.json').write_text(json.dumps(payload, indent=2) + '\n')
 
 
-def write_input_tsv(cases: list[Case]) -> None:
+def write_input_tsv(cases: list[Case]) -> str:
     """one cohort per case - the default Nextflow test input"""
     header = ['cohort', 'path', 'type', 'pedigree', 'config']
     lines = ['\t'.join(header)]
     for case in cases:
         vcf = f'nextflow/inputs/cases/{case.name}/{case.name}.vcf.bgz'
         lines.append('\t'.join([case.name, vcf, 'vcf', PEDIGREES[case.pedigree], 'nextflow/inputs/config.toml']))
-    (OUTPUT_DIR / 'test.tsv').write_text('\n'.join(lines) + '\n')
+    (CASES_DIR / 'multi_case_input.tsv').write_text('\n'.join(lines) + '\n')
+    return str(CASES_DIR / 'multi_case_input.tsv')
 
 
 def build_case(case: Case) -> None:
@@ -478,8 +480,8 @@ def main():
             build_case(case)
 
     # the TSV always covers every case, whichever were rebuilt
-    write_input_tsv(CASES)
-    print(f'wrote {len(CASES)} cohorts to test.tsv')
+    input_tsv_path = write_input_tsv(CASES)
+    print(f'wrote {len(CASES)} cohorts to {input_tsv_path}')
 
 
 if __name__ == '__main__':
