@@ -985,7 +985,7 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
 
             # collect all the dates we have for first category assignment - this must follow the merge above,
             # or every re-found category would contribute today's date
-            category_dates = list(new_var.categories.values())
+            evidence_dates = list(new_var.categories.values())
 
             # record a ClinVar star update, but don't update the dates on this basis
             # we already record 0-star as a distinct category from 1+ star
@@ -1000,7 +1000,7 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             if (new_var.max_confidence > old_var.max_confidence) and (new_var.max_confidence >= GREEN_CONFIDENCE):
                 # if the gene rating bump means this gene is now Green, bump confidence
                 new_var.confidence_increase = True
-                category_dates.append(get_granular_date())
+                evidence_dates.append(get_granular_date())
 
                 # the first time a panel is rated Green - first tagged is moved up
                 new_var.first_tagged = get_granular_date()
@@ -1008,14 +1008,14 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             # we previously had a phenotype match date, carry it forward
             if old_pheno := old_var.date_of_phenotype_match:
                 new_var.date_of_phenotype_match = old_pheno
-                category_dates.append(old_pheno)
+                evidence_dates.append(old_pheno)
 
             # not recording this as an updated date - a new supporting variant is given
             # today's date, so no need to change the date on both events. More useful to separate
             # the date of the 'primary' and date of the new 'secondary'
             new_var.support_vars.update(old_var.support_vars)
 
-            new_var.evidence_last_updated = max(category_dates)
+            new_var.evidence_last_updated = max(evidence_dates)
 
 
 def generate_summary_stats(result_set: ResultData):
