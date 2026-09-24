@@ -92,6 +92,9 @@ BORING_CONSEQUENCES = ['downstream_gene_variant', 'intron_variant', 'upstream_ge
 
 STR_RANGE = re.compile(r'min(?P<min>[0-9]+)max(?P<max>[0-9]+)$')
 
+# numerical confidence rating for a PanelApp Green gene
+GREEN_CONFIDENCE = 3
+
 
 def parse_mane_json_to_dict(mane_json: str) -> dict:
     """
@@ -977,8 +980,7 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             for cat, date in old_var.categories.items():
                 new_var.categories[translate_category(cat)] = date
 
-            # collect all the dates we have for first category assignment - this must follow the merge above,
-            # or every re-found category would contribute today's date
+            # collect all the dates we have for first category assignment
             category_dates = list(new_var.categories.values())
 
             if new_var.clinvar_stars:
