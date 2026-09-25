@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--changelog-start-->
 <!--latest-start-->
 
+[0.4.0] - 2026-09
+
+### Added
+
+* Panel confidence (Red/Amber/Green) is now recorded in the history, and if a variant is newly promoted to Green, this is identified in the report
+* The Report has Emojis next to the date if variant evidence changes: 
+    🆕 - Seen previously, but has additional categories in this round
+    💫 - ClinVar star count has increased
+    🎯 - Newly phenotype-matched
+    🚦 - Newly Green in PanelApp
+
 [0.3.1] - 2026-09
 
 ### Changed
