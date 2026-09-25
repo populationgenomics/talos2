@@ -771,6 +771,7 @@ class Variant:
 
         return display_emojis
 
+
 def cli_main():
     logger.info('Running HTML builder')
     parser = ArgumentParser()

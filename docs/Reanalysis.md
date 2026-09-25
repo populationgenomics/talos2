@@ -20,7 +20,7 @@ During the run, Talos analyses data as standard. Once the result set has been ge
 * If a variant was seen before:
     * `first_tagged` is the latest of either:
       * the first date the variant was seen at any category
-      * the first time the gene was Green in PanelApp 
+      * the first time the gene was Green in PanelApp
     * `date_of_phenotype_match` is None, if there is no phenotype match, otherwise it is set to the earliest date a phenotype match was observed
     * `evidence_last_updated` is the latest of:
       * the dates a category was assigned for the first time
