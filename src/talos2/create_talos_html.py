@@ -33,6 +33,7 @@ from talos2.models import (
     SmallVariant,
     StructuralVariant,
 )
+from talos2.static_values import get_granular_date
 from talos2.utils import read_json_from_path
 
 JINJA_TEMPLATE_DIR = Path(__file__).absolute().parent / 'templates'
@@ -50,7 +51,15 @@ MEAN_SLASH_SAMPLE = 'Mean/sample'
 # reactive to different versions of gnomAD
 GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4.1')
 
+# emoji source https://tools.picsart.com/text/emojis/
 CONFIDENCE_EMOJI: dict[int, str] = {3: '🟢', 2: '🟡', 1: '🔴'}
+REASON_EMOJIS = {
+    'new': '🆕',
+    'clinvar': '💫',
+    'pheno': '🎯',
+    'green': '🚦',
+}
+
 GNOMAD_SV_KEY = f'{GNOMAD_POP}_sv_svid'
 
 
@@ -593,7 +602,8 @@ class Variant:
         self.alt = report_variant.var_data.coordinates.alt
         self.change = self.get_var_change()
         self.categories = report_variant.categories
-        self.evidence_updated: str = report_variant.evidence_last_updated
+        self.first_tagged: str = report_variant.first_tagged
+        self.new_emojis: list[str] = self.assign_new_emojis(vardata=report_variant)
         self.support_vars = report_variant.support_vars
         self.warning_flags = report_variant.flags
         # these are the panel IDs which are matched based on HPO matching in PanelApp
@@ -736,6 +746,30 @@ class Variant:
         mane_hgvsps = ', '.join(mane_hgvsps)
 
         return mane_consequences, mane_hgvsps
+
+    @staticmethod
+    def assign_new_emojis(vardata: ReportVariant) -> list[str]:
+        """Create the list of emojis to display, indicating a reason to review."""
+        display_emojis: list[str] = []
+
+        max_cat_date = max(vardata.categories.values())
+        min_cat_date = min(vardata.categories.values())
+        todays_date = get_granular_date()
+
+        # this is a new variant, no need for emojis
+        if max_cat_date == todays_date == min_cat_date:
+            return display_emojis
+
+        if vardata.confidence_increase:
+            display_emojis.append(REASON_EMOJIS['green'])
+        if vardata.date_of_phenotype_match == todays_date:
+            display_emojis.append(REASON_EMOJIS['pheno'])
+        if max_cat_date == todays_date:
+            display_emojis.append(REASON_EMOJIS['new'])
+        if vardata.clinvar_increase:
+            display_emojis.append(REASON_EMOJIS['clinvar'])
+
+        return display_emojis
 
 
 def cli_main():

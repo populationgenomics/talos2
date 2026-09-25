@@ -227,7 +227,7 @@ def test_annotate_dates_confidence_increase():
     assert variant.confidence_increase
     assert variant.evidence_last_updated == today
     # the category itself was first seen in the old run, so first_tagged is preserved
-    assert variant.first_tagged == OLD_DATE
+    assert variant.first_tagged == today
 
 
 def test_annotate_dates_confidence_placeholder_ignored():

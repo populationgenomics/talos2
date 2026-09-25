@@ -80,7 +80,7 @@ For Nextflow deployments which allow for `-output-dir` to be used as a parameter
 To build the Docker image:
 
 ```
-docker build -t talos2:0.3.1 .
+docker build -t talos2:0.4.0 .
 ```
 
 ### **2. Download Annotation Resources**
@@ -183,7 +183,7 @@ Only variants passing configured thresholds and logic modules are returned.
 
 ## **🔁 Reanalysis Mode**
 
-Talos is designed to support **automated, iterative reanalysis** of undiagnosed cohorts. To do this it reads the results of previous analyses, and integrates them into the latest report. This is currently done by reading in prior analysis results, and incorporating the previous observations with each run. To use this behaviour, use the config setting `params.previous_results`. See [History](docs/Reanalysis.md) for more information.
+Talos is designed to support **automated, iterative reanalysis** of undiagnosed cohorts. To do this it reads the results of previous analyses, and integrates them into the latest report. This is currently done by reading in prior analysis results, and incorporating the previous observations with each run. To use this behaviour, use the `history` column in the input TSV - see [History](docs/Reanalysis.md) for more information.
 
 ### **How it works:**
 

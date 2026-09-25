@@ -49,7 +49,7 @@ For Nextflow deployments which allow for `-output-dir` to be used as a parameter
 To build the Docker image:
 
 ```
-docker build -t talos2:0.3.1 .
+docker build -t talos2:0.4.0 .
 ```
 
 ### **2. Download Annotation Resources**

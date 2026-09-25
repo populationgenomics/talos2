@@ -92,6 +92,9 @@ BORING_CONSEQUENCES = ['downstream_gene_variant', 'intron_variant', 'upstream_ge
 
 STR_RANGE = re.compile(r'min(?P<min>[0-9]+)max(?P<max>[0-9]+)$')
 
+# numerical confidence rating for a PanelApp Green gene
+GREEN_CONFIDENCE = 3
+
 
 def parse_mane_json_to_dict(mane_json: str) -> dict:
     """
@@ -973,40 +976,53 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             # we found this variant again, but do we have any new categories to add?
             new_var = new_vars[old_coord]
 
-            # categories seen before keep their original date, anything new is dated today
+            # categories seen before keep their original date
             for cat, date in old_var.categories.items():
                 new_var.categories[translate_category(cat)] = date
 
+            # standard first-tagged date: earliest day of category assignment
+            new_var.first_tagged = min(new_var.categories.values())
+
             # collect all the dates we have for first category assignment - this must follow the merge above,
             # or every re-found category would contribute today's date
-            category_dates = list(new_var.categories.values())
+            evidence_dates = list(new_var.categories.values())
 
+            # record a ClinVar star update, but don't update the dates on this basis
+            # we already record 0-star as a distinct category from 1+ star
             if new_var.clinvar_stars:
                 new_var.clinvar_increase = bool(
                     old_var.clinvar_stars is None or new_var.clinvar_stars > old_var.clinvar_stars,
                 )
-                if new_var.clinvar_increase:
-                    category_dates.append(get_granular_date())
 
             # if the latest event has an upgraded panel confidence, today's date drives the discovery date
-            # we always want to recognise a jump, e.g. Amber -> Green, with an updated date
-            if new_var.max_confidence > old_var.max_confidence != -1:
-                # this represents missing data, not a real value - placeholder during the upgrade
+            # we always want to recognise a jump to green, Amber/Red panel usage depends on local appetite
+
+            # this is a placeholder applied during liftover, we replace this value with the current confidence level
+            if old_var.max_confidence == -1:
+                pass
+
+            elif (new_var.max_confidence > old_var.max_confidence) and (new_var.max_confidence >= GREEN_CONFIDENCE):
+                # if the gene rating bump means this gene is now Green, bump confidence
                 new_var.confidence_increase = True
-                category_dates.append(get_granular_date())
+                evidence_dates.append(get_granular_date())
+
+                # the first time a panel is rated Green - first tagged is moved up
+                new_var.first_tagged = get_granular_date()
+
+            # take the latest value when writing a new history
+            new_var.max_confidence = max(old_var.max_confidence, new_var.max_confidence)
 
             # we previously had a phenotype match date, carry it forward
             if old_pheno := old_var.date_of_phenotype_match:
                 new_var.date_of_phenotype_match = old_pheno
-                category_dates.append(old_pheno)
+                evidence_dates.append(old_pheno)
 
-            # new supporting comp-het partners = new evidence change date
-            if new_var.support_vars - old_var.support_vars:
-                category_dates.append(get_granular_date())
+            # not recording this as an updated date - a new supporting variant is given
+            # today's date, so no need to change the date on both events. More useful to separate
+            # the date of the 'primary' and date of the new 'secondary'
             new_var.support_vars.update(old_var.support_vars)
 
-            new_var.evidence_last_updated = max(category_dates)
-            new_var.first_tagged = min(new_var.categories.values())
+            new_var.evidence_last_updated = max(evidence_dates)
 
 
 def generate_summary_stats(result_set: ResultData):
@@ -1025,6 +1041,10 @@ def generate_summary_stats(result_set: ResultData):
 
         # iterate over all identified variants
         for each_var in sample_results.variants:
+            # stats for the current run should only show variants found in this round
+            if not each_var.found_in_current_run:
+                continue
+
             var_string = each_var.var_data.coordinates.string_format
 
             # catch all comp-het pairs as a single variant - we are electing to count comp-het events as a single
