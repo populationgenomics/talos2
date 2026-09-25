@@ -1005,6 +1005,9 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
                 # the first time a panel is rated Green - first tagged is moved up
                 new_var.first_tagged = get_granular_date()
 
+            elif old_var.max_confidence > new_var.max_confidence:
+                new_var.max_confidence = old_var.max_confidence
+
             # we previously had a phenotype match date, carry it forward
             if old_pheno := old_var.date_of_phenotype_match:
                 new_var.date_of_phenotype_match = old_pheno
