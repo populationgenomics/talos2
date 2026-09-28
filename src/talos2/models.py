@@ -397,8 +397,14 @@ class ReportVariant(BaseModel):
 
     # this will be determined based on the specific panels applied to a participant
     max_confidence: int = Field(default_factory=int)
+
     # log whether there was an increase in panel confidence since the last run
     confidence_increase: bool = Field(default=False)
+
+    # this needs to be an empty placeholder for the purposes of a liftover
+    # defaulting to a specific date means any non-green classifications in results until now won't be flagged as
+    # newly-green correctly
+    newly_green_date: str = Field(default_factory=str)
 
     def __eq__(self, other):
         """
