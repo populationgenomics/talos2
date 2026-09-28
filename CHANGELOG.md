@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     🆕 - Seen previously, but has additional categories in this round
     💫 - ClinVar star count has increased
     🎯 - Newly phenotype-matched
-    🚦 - Newly Green in PanelApp (this will update the first_tagged to today in this run)
+    🚦 - Newly Green in PanelApp (this will update the first_tagged to today in this run, and future reports)
 
 [0.3.0]
 
