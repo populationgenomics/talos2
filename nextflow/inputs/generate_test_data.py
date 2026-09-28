@@ -7,7 +7,7 @@ annotation payload they used to attach (VEP consequences, gnomAD, ClinVar, Splic
 reached the VCF anyway - the old hl.export_vcf() call only had a slot for `info` and per-sample
 FORMAT fields, so every other field on the Hail row was silently dropped on export. The only things
 that have to round-trip here are locus, alleles, INFO AC/AF/AN, and the per-sample
-GT/AD/DP/GQ/PL/PS values run_stream_filtering.py and friends read - annotation gets attached
+GT/AD/DP/GQ/PL/PS values run_small_filtering.py and friends read - annotation gets attached
 downstream by the real annotation.nf workflow (bcftools csq, echtvar), not by this script.
 
 Genotype/PL defaults mirror the deleted data_model.Entry: AD defaults to [15, 15] (DP=30), GQ

@@ -1,5 +1,5 @@
 """
-Tests for the streaming small-variant filtering process (run_stream_filtering.py).
+Tests for the streaming small-variant filtering process (run_small_filtering.py).
 
 These port the behavioural spec from the Hail tests (test_hail_categories.py,
 test_hail_filters.py, test_de_novo.py) onto the cyvcf2 implementation.
@@ -11,7 +11,7 @@ import pytest
 from cyvcf2 import VCF
 
 from talos2.models import PanelApp, PanelDetail
-from talos2.run_stream_filtering import (
+from talos2.run_small_filtering import (
     AUTOSOME_OR_PAR,
     HET,
     HOM_ALT,
@@ -37,7 +37,7 @@ from talos2.run_stream_filtering import (
     resolve_trio_entry,
     variant_region,
 )
-from talos2.run_stream_filtering import (
+from talos2.run_small_filtering import (
     main as streaming_main,
 )
 from talos2.vcf_streaming import MISSING_STRING, PATHOGENIC

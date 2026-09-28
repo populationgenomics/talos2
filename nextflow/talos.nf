@@ -7,7 +7,7 @@ include { AnnotateVcfWithFreshClinvar } from './modules/talos/AnnotateVcfWithFre
 include { ConcatLabelledVcfs } from './modules/talos/ConcatLabelledVcfs/main'
 include { UnifiedPanelAppParser } from './modules/talos/UnifiedPanelAppParser/main'
 include { RunSvFiltering } from './modules/talos/RunSvFiltering/main'
-include { RunStreamingFiltering } from './modules/talos/RunStreamingFiltering/main'
+include { RunSmallFiltering } from './modules/talos/RunSmallFiltering/main'
 include { ValidateMOI } from './modules/talos/ValidateMOI/main'
 include { HPOFlagging } from './modules/talos/HPOFlagging/main'
 include { CreateTalosHTML } from './modules/talos/CreateTalosHTML/main'
@@ -101,7 +101,7 @@ workflow TALOS {
             tuple(cohort, vcf, panelapp_data, pedigree, config)
         }
 
-    RunStreamingFiltering(
+    RunSmallFiltering(
         ch_streaming_inputs,
         ch_mane,
         ch_clinvar_pm5,
@@ -109,7 +109,7 @@ workflow TALOS {
 
     // gather the labelled shards back to one VCF per cohort
     ConcatLabelledVcfs(
-        RunStreamingFiltering.out.groupTuple(by: 0),
+        RunSmallFiltering.out.groupTuple(by: 0),
     )
 
     // filter & label any annotated SV VCFs. ch_sv_annotated only carries cohorts that had SV data, so this

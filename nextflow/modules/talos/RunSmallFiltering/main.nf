@@ -1,4 +1,4 @@
-process RunStreamingFiltering {
+process RunSmallFiltering {
     container params.container
 
     // filter and category-label one annotated shard in a single cyvcf2 pass. The MANE JSON is

@@ -15,7 +15,7 @@ from loguru import logger
 from mendelbrot.pedigree_parser import PedigreeParser
 
 from talos2.config import config_check, config_retrieve
-from talos2.run_stream_filtering import GNOMAD_SOURCE_FIELDS
+from talos2.run_small_filtering import GNOMAD_SOURCE_FIELDS
 from talos2.vcf_streaming import header_has_field, split_csq_header
 
 # collect all parsing errors as strings, print before crashing (unless everything passes...)

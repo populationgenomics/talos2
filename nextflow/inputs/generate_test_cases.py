@@ -14,7 +14,7 @@ from the source, then trimmed to the FLANK nearest rows either side of the targe
 of interest are then injected with the genotype pattern the case is testing.
 
 INFO is dropped entirely - NormaliseVcf recomputes AC/AN/AF with `bcftools +fill-tags`. FORMAT is trimmed to the
-fields run_stream_filtering.py reads (GT:AD:DP:GQ:PS), so injected rows and real rows look alike. FORMAT/PL could be
+fields run_small_filtering.py reads (GT:AD:DP:GQ:PS), so injected rows and real rows look alike. FORMAT/PL could be
 estimated, but Talos ignores the field so it is dropped.
 
 Each case directory also gets an expected.json - the machine-checkable outcome that test/test_case_expectations.py
