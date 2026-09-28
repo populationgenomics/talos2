@@ -198,7 +198,12 @@ DATE_VAR = SmallVariant(
 )
 
 
-def _single_variant_results(max_confidence: int, date: str, **kwargs: str | bool) -> ResultData:
+def _single_variant_results(
+    max_confidence: int,
+    date: str,
+    newly_green: str = '',
+    **kwargs: str | bool,
+) -> ResultData:
     """Build a ResultData with one sample carrying one variant, tagged with a single category on the given date."""
     variant = ReportVariant(
         sample='sam1',
@@ -208,6 +213,7 @@ def _single_variant_results(max_confidence: int, date: str, **kwargs: str | bool
         max_confidence=max_confidence,
         first_tagged=date,
         evidence_last_updated=date,
+        newly_green_date=newly_green,
         **kwargs,
     )
     return ResultData(
@@ -226,8 +232,24 @@ def test_annotate_dates_confidence_increase():
     variant = new.results['sam1'].variants[0]
     assert variant.confidence_increase
     assert variant.evidence_last_updated == today
-    # the category itself was first seen in the old run, so first_tagged is preserved
+    # the category itself was seen in the old run, but a transition to green is marked
     assert variant.first_tagged == today
+    assert variant.newly_green_date == today
+
+
+def test_newly_green_date_persists():
+    """A genuine jump in panel confidence flags the variant and re-dates the evidence to today."""
+    today = get_granular_date()
+    between_super_old_and_now = '2022-01-01'
+    old = _single_variant_results(max_confidence=3, date=OLD_DATE, newly_green=between_super_old_and_now)
+
+    new = _single_variant_results(max_confidence=3, date=today)
+
+    annotate_variant_dates_using_prior_results(new, old)
+
+    variant = new.results['sam1'].variants[0]
+    assert variant.evidence_last_updated == between_super_old_and_now
+    assert variant.first_tagged == between_super_old_and_now
 
 
 def test_annotate_dates_confidence_placeholder_ignored():

@@ -92,7 +92,7 @@ BORING_CONSEQUENCES = ['downstream_gene_variant', 'intron_variant', 'upstream_ge
 
 STR_RANGE = re.compile(r'min(?P<min>[0-9]+)max(?P<max>[0-9]+)$')
 
-# numerical confidence rating for a PanelApp Green gene
+# numerical confidence for a green Gene in PanelApp
 GREEN_CONFIDENCE = 3
 
 
@@ -980,12 +980,22 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
             for cat, date in old_var.categories.items():
                 new_var.categories[translate_category(cat)] = date
 
-            # standard first-tagged date: earliest day of category assignment
-            new_var.first_tagged = min(new_var.categories.values())
-
             # collect all the dates we have for first category assignment - this must follow the merge above,
             # or every re-found category would contribute today's date
             evidence_dates = list(new_var.categories.values())
+
+            # set the provisional first-tagged date based on categories or the date this variant became green
+            # date of becoming green, implying previous amber/red rating during a Talos run, is preserved
+            if old_var.newly_green_date:
+                # preserve the date this became green
+                new_var.newly_green_date = old_var.newly_green_date
+                evidence_dates.append(old_var.newly_green_date)
+
+                # pick the latter of (first categorised) | (newly green but previously seen)
+                new_var.first_tagged = max(min(new_var.categories.values()), old_var.newly_green_date)
+
+            else:
+                new_var.first_tagged = min(new_var.categories.values())
 
             # record a ClinVar star update, but don't update the dates on this basis
             # we already record 0-star as a distinct category from 1+ star
@@ -994,7 +1004,7 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
                     old_var.clinvar_stars is None or new_var.clinvar_stars > old_var.clinvar_stars,
                 )
 
-            # if the latest event has an upgraded panel confidence, today's date drives the discovery date
+            # if the latest event has an upgraded panel confidence, today's date drives the discovery date.
             # we always want to recognise a jump to green, Amber/Red panel usage depends on local appetite
 
             # this is a placeholder applied during liftover, we replace this value with the current confidence level
@@ -1009,7 +1019,10 @@ def annotate_variant_dates_using_prior_results(results: ResultData, previous_res
                 # the first time a panel is rated Green - first tagged is moved up
                 new_var.first_tagged = get_granular_date()
 
-            # take the latest value when writing a new history
+                new_var.newly_green_date = get_granular_date()
+
+            # take the highest confidence when building the history
+            # outside chance a gene going green->amber would be presented as Green due to this...
             new_var.max_confidence = max(old_var.max_confidence, new_var.max_confidence)
 
             # we previously had a phenotype match date, carry it forward
@@ -1041,10 +1054,6 @@ def generate_summary_stats(result_set: ResultData):
 
         # iterate over all identified variants
         for each_var in sample_results.variants:
-            # stats for the current run should only show variants found in this round
-            if not each_var.found_in_current_run:
-                continue
-
             var_string = each_var.var_data.coordinates.string_format
 
             # catch all comp-het pairs as a single variant - we are electing to count comp-het events as a single
