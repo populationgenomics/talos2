@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--changelog-start-->
 <!--latest-start-->
 
-[0.4.0]
+[0.4.0] - 2026-09
 
 ### Added
 
@@ -26,7 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     🆕 - Seen previously, but has additional categories in this round
     💫 - ClinVar star count has increased
     🎯 - Newly phenotype-matched
-    🚦 - Newly Green in PanelApp (this will update the first_tagged to today in this run, and future reports)
+    🚦 - Newly Green in PanelApp
+
+[0.3.1] - 2026-09
+
+### Changed
+
+* The MakeScatterRegions module only detects and scatters across chr1-22,X,Y, ignoring chrM and decoy contigs. There are no PanelApp genes on decoy contigs, and chrM has a separate annotation flow
 
 [0.3.0]
 

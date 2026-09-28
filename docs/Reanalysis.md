@@ -16,9 +16,14 @@ For NextFlow, this is mediated through the `history` column in the input TSV.
 
 During the run, Talos analyses data as standard. Once the result set has been generated, the previous file is loaded up and current results are compared to its contents:
 
-* if a variant is newly detected, the dates are maintained as the current date
+* if a variant is newly detected, the dates are unchanged
 * If a variant was seen before:
-    * `first_tagged` is set to the date of its first observation, of any category
-    * `evidence_last_updated` is set to the most recent date a category was assigned for the first time
-    * if a variant was seen before, and is now seen with a novel comp-het partner, `evidence_last_updated` is today
+    * `first_tagged` is the latest of either:
+      * the first date the variant was seen at any category
+      * the first time the gene was Green in PanelApp
     * `date_of_phenotype_match` is None, if there is no phenotype match, otherwise it is set to the earliest date a phenotype match was observed
+    * `evidence_last_updated` is the latest of:
+      * the dates a category was assigned for the first time
+      * the latest date an associated ClinVar record increased its number of stars
+      * a variant was first a phenotype-match
+      * a gene was newly green in PanelApp
