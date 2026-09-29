@@ -22,9 +22,9 @@ from talos2.config import config_retrieve
 from talos2.exclusion_log import get_exclusion_logger
 from talos2.models import (
     FamilyMembers,
+    GeneDetail,
     MemberSex,
     PanelApp,
-    GeneDetail,
     ParticipantHPOPanels,
     ParticipantMeta,
     ParticipantResults,

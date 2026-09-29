@@ -10,7 +10,7 @@ import json
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import PanelApp, GeneDetail
+from talos2.models import GeneDetail, PanelApp
 from talos2.run_small_filtering import (
     AUTOSOME_OR_PAR,
     HET,

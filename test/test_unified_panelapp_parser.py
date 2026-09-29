@@ -8,9 +8,9 @@ from talos2.models import (
     DownloadedPanelApp,
     DownloadedPanelAppGene,
     DownloadedPanelAppPanel,
+    GeneDetail,
     HpoTerm,
     PanelApp,
-    GeneDetail,
     PanelShort,
     ParticipantHPOPanels,
 )

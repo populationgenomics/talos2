@@ -5,10 +5,10 @@ A home for all data models used in Talos
 import re
 from enum import Enum
 from itertools import pairwise
-from packaging.version import Version
 from typing import Any
 
 from loguru import logger
+from packaging.version import Version
 from pydantic import BaseModel, Field
 
 from talos2.liftover.lift_1_0_0_to_1_0_1 import resultdata as rd_100_to_101

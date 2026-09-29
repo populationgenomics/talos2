@@ -24,8 +24,8 @@ from loguru import logger
 
 from talos2.config import config_retrieve
 from talos2.models import (
-    PanelApp,
     GeneDetail,
+    PanelApp,
     PanelShort,
     ReportVariant,
     ResultData,

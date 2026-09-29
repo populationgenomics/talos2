@@ -9,7 +9,7 @@ from typing import ClassVar
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import PanelApp, GeneDetail
+from talos2.models import GeneDetail, PanelApp
 from talos2.reformat_and_label_mito_vcf import main as mito_main
 from talos2.vcf_streaming import (
     PATHOGENIC,

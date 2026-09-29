@@ -9,7 +9,7 @@ fix, and the end-to-end labelling process.
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import PanelApp, GeneDetail
+from talos2.models import GeneDetail, PanelApp
 from talos2.run_sv_filtering import (
     diploidise_genotypes,
     passes_af_filter,
