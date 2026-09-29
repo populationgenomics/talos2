@@ -9,7 +9,7 @@ fix, and the end-to-end labelling process.
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import PanelApp, PanelDetail
+from talos2.models import PanelApp, GeneDetail
 from talos2.run_sv_filtering import (
     diploidise_genotypes,
     passes_af_filter,
@@ -176,7 +176,7 @@ class TestSvMain:
         vcf_path = tmp_path / 'input.vcf'
         vcf_path.write_text(SV_VCF_HEADER + ''.join(f'{row}\n' for row in vcf_rows))
 
-        panel = PanelApp(genes={'ENSG1': PanelDetail(symbol='GENE1', chrom='1')})
+        panel = PanelApp(genes={'ENSG1': GeneDetail(symbol='GENE1', chrom='1')})
         pa_path = tmp_path / 'panelapp.json'
         pa_path.write_text(panel.model_dump_json())
 
@@ -252,7 +252,7 @@ class TestSvMain:
     def test_no_shared_samples_raises(self, tmp_path):
         vcf_path = tmp_path / 'input.vcf'
         vcf_path.write_text(SV_VCF_HEADER)
-        panel = PanelApp(genes={'ENSG1': PanelDetail(symbol='GENE1', chrom='1')})
+        panel = PanelApp(genes={'ENSG1': GeneDetail(symbol='GENE1', chrom='1')})
         pa_path = tmp_path / 'panelapp.json'
         pa_path.write_text(panel.model_dump_json())
         ped_path = tmp_path / 'pedigree.ped'

@@ -24,7 +24,7 @@ from talos2.models import (
     FamilyMembers,
     MemberSex,
     PanelApp,
-    PanelDetail,
+    GeneDetail,
     ParticipantHPOPanels,
     ParticipantMeta,
     ParticipantResults,
@@ -103,7 +103,7 @@ def set_up_moi_filters(panelapp_data: PanelApp, pedigree: PedigreeParser) -> dic
 def apply_moi_to_variants(
     variant_dict: GeneDict,
     moi_lookup: dict[str, MOIRunner],
-    panelapp_data: dict[str, PanelDetail],
+    panelapp_data: dict[str, GeneDetail],
     pedigree: PedigreeParser,
 ) -> list[ReportVariant]:
     """
