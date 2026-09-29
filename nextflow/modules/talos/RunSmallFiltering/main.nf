@@ -18,7 +18,7 @@ process RunSmallFiltering {
 
         export TALOS_CONFIG=${talos_config}
 
-        python -m talos2.run_stream_filtering \
+        python -m talos2.run_small_filtering \
             --input ${vcf} \
             --panelapp ${panelapp_data} \
             --pedigree ${pedigree} \
