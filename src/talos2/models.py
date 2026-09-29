@@ -5,6 +5,7 @@ A home for all data models used in Talos
 import re
 from enum import Enum
 from itertools import pairwise
+from packaging.version import Version
 from typing import Any
 
 from loguru import logger
@@ -79,6 +80,11 @@ CATEGORY_TRANSLATOR: dict[str, str] = {
 }
 
 CATEGORY_FLATTENER = re.compile(r'[\W_]+', re.ASCII)
+
+
+def is_version_lower(object_version: str, query_version: str) -> bool:
+    """Quick test to see if an 'X.Y.Z' format version number is lower than a comparison value."""
+    return Version(object_version) <= Version(query_version)
 
 
 def translate_category(cat: str) -> str:
@@ -442,6 +448,7 @@ class GeneDetail(BaseModel):
     panels: set[int] = Field(default_factory=set)
     panel_confidences: dict[int, int] = Field(default_factory=dict)
 
+
 class StrDetail(BaseModel):
     """
     An STR from PanelApp, combining all MOI and panel IDs
@@ -468,6 +475,7 @@ class StrDetail(BaseModel):
     # and where does it appear?
     panels: set[int] = Field(default_factory=set)
     panel_confidences: dict[int, int] = Field(default_factory=dict)
+
 
 class PanelShort(BaseModel):
     """
@@ -524,6 +532,7 @@ class DownloadedPanelAppStr(BaseModel):
     pathogenic_repeats: int = Field(default_factory=int)
     repeat_unit: str = Field(default_factory=str)
     expansion: bool = Field(default_factory=bool)
+
 
 class DownloadedPanelApp(BaseModel):
     """ """
