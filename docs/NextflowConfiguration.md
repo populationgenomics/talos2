@@ -61,7 +61,7 @@ steps have completed. A full GATK-SV callset carries all of them; a bare gCNV or
 ### Trying it out
 
 `nextflow/inputs/test_sv.tsv` is the SNV test input plus an `sv` column, pointing at a small adversarial SV
-VCF. `nextflow/inputs/test.tsv` deliberately has no `sv` column, so the default test run never requires the
+VCF (it also has an `str` column, see [Short Tandem Repeats](#short-tandem-repeats)). `nextflow/inputs/test.tsv` deliberately has no `sv` column, so the default test run never requires the
 478 MB of SV reference data. Regenerate the test VCF with:
 
 ```bash
@@ -112,13 +112,14 @@ Talos reads these fields:
 | `FORMAT/DISEASE_DETAILS` | per-disease normal/intermediate ranges and pathogenic threshold                        |
 
 The only STR calls that can be reported are those at PanelApp STR entities that pass the cohort's `confidence_level`
-on one of its panels. See `pheno_match_strs` in [Configuration.md](Configuration.md) to limit STRs to
-phenotype-matched panels.
+on one of its panels. By default only phenotype-matched and forced panels count, not the `default_panel`. See
+`pheno_match_strs` in [Configuration.md](Configuration.md).
 
 ### Trying it out
 
 `nextflow/inputs/test_sv.tsv` includes a `str` column for the `premerged` cohort. It points to a small simulated STR
-VCF, whose cases and expected outcomes are listed in the docstring of the generator. Regenerate the VCF with:
+VCF, whose cases and expected outcomes are listed in the docstring of the generator. The test config sets
+`pheno_match_strs = false`, as none of the test proband's matched panels carry an STR. Regenerate the VCF with:
 
 ```bash
 uv run python nextflow/inputs/generate_str_test_data.py

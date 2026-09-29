@@ -109,7 +109,7 @@ products publish to `${cohort}_annotated/`, analysis results to `${cohort}_analy
 
 Two spines, deliberately distinct — get this wrong and processes silently stall:
 
-- `ch_meta` — **one row per cohort**: `[cohort, pedigree, config, history, ext_ids, seqr_map, mito]`
+- `ch_meta` — **one row per cohort**: `[cohort, pedigree, config, history, ext_ids, seqr_map, mito, str]`
 - `ch_shards` — **one row per annotated shard**: `[cohort, vcf]`
 
 Fanning per-cohort metadata across shards uses `combine(..., by: 0)`, never `join` (a join matches
@@ -129,6 +129,9 @@ converge on **`ValidateMOI`**, which is the only stage that sees all of them:
 | Small   | `run_stream_filtering.py`        | per shard, gathered by `ConcatLabelledVcfs` |
 | SV      | `run_sv_filtering.py`            | per cohort                                  |
 | Mito    | `reformat_and_label_mito_vcf.py` | per cohort                                  |
+
+STRs are a fourth, unlabelled input: the `str` TSV column (a `stripy_json_to_vcf.py` VCF) goes straight from
+`ch_meta` to `ValidateMOI --str`, and `create_str_variant` in `utils.py` assigns the `str` category on read.
 
 `validate_moi.py` reads the labelled VCFs, builds pydantic models, and runs `moi_tests.py`;
 `hpo_flagging.py` then annotates phenotype matches, and `create_talos_html.py` renders the report.

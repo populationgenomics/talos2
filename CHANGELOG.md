@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.5.0] - 2026-09
 
+## Added
+
+  * STR data can be supplied per cohort through a new optional `str` column in the input TSV, and is passed to ValidateMOI
+  * `nextflow/inputs/generate_str_test_data.py` simulates an STR VCF for the test trio, used by `test_sv.tsv`
+
 ## Changed
 
   * The way STRs are handled has been changed. PanelApp now contains STRs curated into each phenotype-specific panel
