@@ -80,7 +80,7 @@ For Nextflow deployments which allow for `-output-dir` to be used as a parameter
 To build the Docker image:
 
 ```
-docker build -t talos2:0.4.0 .
+docker build -t talos2:0.5.0 .
 ```
 
 ### **2. Download Annotation Resources**
@@ -277,9 +277,9 @@ There is one key difference - the 'asset' files (e.g. `nextflow/assets/NO_FILE`)
 
 e.g. these two config files (as TSVs) are functionally equivalent:
 
-| cohort | path               | type | pedigree              | config               | history  | ext_ids | seqr_map | mito | sv |
-|--------|--------------------|------|-----------------------|----------------------|----------|--|--|--|--|
-| CohA   | /path/to/a.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml |          | | | | | |
+| cohort | path               | type | pedigree              | config               | history  | ext_ids | seqr_map | mito | sv | str |
+|--------|--------------------|------|-----------------------|----------------------|----------|--|--|--|--|--|
+| CohA   | /path/to/a.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml |          | | | | | | |
 
 | cohort | path               | type | pedigree              | config               |
 |--------|--------------------|------|-----------------------|----------------------|
@@ -287,13 +287,17 @@ e.g. these two config files (as TSVs) are functionally equivalent:
 
 And missing/supplied content can differ per row; this config would provide all mandatory inputs plus the `history` and `mito` file for `CohA`, and only mandatory inputs for `CohB`:
 
-| cohort | path               | type | pedigree              | config               | history         | ext_ids | seqr_map | mito                 | sv |
-|--------|--------------------|------|-----------------------|----------------------|-----------------|---------|----------|----------------------|----|
-| CohA   | /path/to/a.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml | /path/to/a.json |         |          | /path/to/mito.vcf.gz |    |
-| CohB   | /path/to/b.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml |                 |         |          |                      |    |
+| cohort | path               | type | pedigree              | config               | history         | ext_ids | seqr_map | mito                 | sv | str |
+|--------|--------------------|------|-----------------------|----------------------|-----------------|---------|----------|----------------------|----|-----|
+| CohA   | /path/to/a.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml | /path/to/a.json |         |          | /path/to/mito.vcf.gz |    |     |
+| CohB   | /path/to/b.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml |                 |         |          |                      |    |     |
 
 > **Note**
 > if the `sv` column is defined at all in the input TSV, the SV input resources must be present. If the SV column is missing entirely, the SV workflow is never invoked, so no checks are made against the SV reference data.
+
+The optional `str` column takes a bgzipped multi-sample STR VCF, as written by `talos2.scripts.stripy_json_to_vcf` from
+per-sample STRipy JSON reports. It is not annotated, and is passed straight to `ValidateMOI`. See
+[NextflowConfiguration.md](docs/NextflowConfiguration.md#short-tandem-repeats) for details.
 
 ### Outputs:
 

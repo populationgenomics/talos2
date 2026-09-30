@@ -13,3 +13,11 @@ def resultdata(data_dict: dict) -> dict:
             var['newly_green'] = ''
     data_dict['version'] = '2.5.0'
     return data_dict
+
+
+def panelapp(data_dict: dict) -> dict:
+    _str_genes = data_dict.pop('str_genes')
+    _str_symbols = data_dict.pop('str_symbols')
+    data_dict['strs'] = {}
+    data_dict['version'] = '2.5.0'
+    return data_dict

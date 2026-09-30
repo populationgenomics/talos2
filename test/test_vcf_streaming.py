@@ -9,7 +9,7 @@ from typing import ClassVar
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import PanelApp, PanelDetail
+from talos2.models import GeneDetail, PanelApp
 from talos2.reformat_and_label_mito_vcf import main as mito_main
 from talos2.vcf_streaming import (
     PATHOGENIC,
@@ -75,7 +75,7 @@ def clinvar_info(significance: str, stars: int, allele: int) -> str:
 def make_panelapp(tmp_path, genes: dict[str, tuple[str, str]]):
     """genes: {ensg: (symbol, chrom)}"""
     panel = PanelApp(
-        genes={ensg: PanelDetail(symbol=symbol, chrom=chrom) for ensg, (symbol, chrom) in genes.items()},
+        genes={ensg: GeneDetail(symbol=symbol, chrom=chrom) for ensg, (symbol, chrom) in genes.items()},
     )
     pa_path = tmp_path / 'panelapp.json'
     pa_path.write_text(panel.model_dump_json())

@@ -1,5 +1,5 @@
 """
-Tests for the streaming small-variant filtering process (run_stream_filtering.py).
+Tests for the streaming small-variant filtering process (run_small_filtering.py).
 
 These port the behavioural spec from the Hail tests (test_hail_categories.py,
 test_hail_filters.py, test_de_novo.py) onto the cyvcf2 implementation.
@@ -10,8 +10,8 @@ import json
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import PanelApp, PanelDetail
-from talos2.run_stream_filtering import (
+from talos2.models import GeneDetail, PanelApp
+from talos2.run_small_filtering import (
     AUTOSOME_OR_PAR,
     HET,
     HOM_ALT,
@@ -37,7 +37,7 @@ from talos2.run_stream_filtering import (
     resolve_trio_entry,
     variant_region,
 )
-from talos2.run_stream_filtering import (
+from talos2.run_small_filtering import (
     main as streaming_main,
 )
 from talos2.vcf_streaming import MISSING_STRING, PATHOGENIC
@@ -134,7 +134,7 @@ def make_pedigree(tmp_path):
 
 def run_streaming(tmp_path, monkeypatch, rows: list[str], new_gene: bool = False, pm5: dict | None = None):
     """Run the full streaming process over constructed rows, returning the labelled output variants."""
-    monkeypatch.setattr('talos2.run_stream_filtering.config_retrieve', fake_config_retrieve)
+    monkeypatch.setattr('talos2.run_small_filtering.config_retrieve', fake_config_retrieve)
     monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', fake_config_retrieve)
 
     vcf_path = tmp_path / 'input.vcf'
@@ -142,8 +142,8 @@ def run_streaming(tmp_path, monkeypatch, rows: list[str], new_gene: bool = False
 
     panel = PanelApp(
         genes={
-            'ENSG_GREEN': PanelDetail(symbol='GENE1', chrom='1', new=[1] if new_gene else []),
-            'ENSG_OTHER': PanelDetail(symbol='GENE2', chrom='1'),
+            'ENSG_GREEN': GeneDetail(symbol='GENE1', chrom='1', new=[1] if new_gene else []),
+            'ENSG_OTHER': GeneDetail(symbol='GENE2', chrom='1'),
         },
     )
     panel_path = tmp_path / 'panelapp.json'
@@ -666,10 +666,10 @@ def test_af_derived_when_absent(tmp_path, monkeypatch):
     rows = [make_row(info_string, gts=TRIO_GTS)]
     vcf_path.write_text(header_no_af + ''.join(f'{row}\n' for row in rows))
 
-    monkeypatch.setattr('talos2.run_stream_filtering.config_retrieve', fake_config_retrieve)
+    monkeypatch.setattr('talos2.run_small_filtering.config_retrieve', fake_config_retrieve)
     monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', fake_config_retrieve)
 
-    panel = PanelApp(genes={'ENSG_GREEN': PanelDetail(symbol='GENE1', chrom='1')})
+    panel = PanelApp(genes={'ENSG_GREEN': GeneDetail(symbol='GENE1', chrom='1')})
     panel_path = tmp_path / 'panelapp.json'
     panel_path.write_text(panel.model_dump_json())
     mane_path = tmp_path / 'mane.json'
@@ -689,13 +689,13 @@ def test_af_derived_when_absent(tmp_path, monkeypatch):
 
 
 def test_no_shared_samples_raises(tmp_path, monkeypatch):
-    monkeypatch.setattr('talos2.run_stream_filtering.config_retrieve', fake_config_retrieve)
+    monkeypatch.setattr('talos2.run_small_filtering.config_retrieve', fake_config_retrieve)
     monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', fake_config_retrieve)
 
     vcf_path = tmp_path / 'input.vcf'
     vcf_path.write_text(VCF_HEADER + make_row(f'BCSQ={bcsq()};{BASE_INFO}') + '\n')
 
-    panel = PanelApp(genes={'ENSG_GREEN': PanelDetail(symbol='GENE1', chrom='1')})
+    panel = PanelApp(genes={'ENSG_GREEN': GeneDetail(symbol='GENE1', chrom='1')})
     panel_path = tmp_path / 'panelapp.json'
     panel_path.write_text(panel.model_dump_json())
     mane_path = tmp_path / 'mane.json'

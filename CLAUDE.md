@@ -53,21 +53,20 @@ Python env is managed by `uv` (`uv.lock` is authoritative for the container buil
 
 ```bash
 uv sync --frozen --extra test          # dev install
-uv run pytest -n auto                  # full suite (see caveat below)
+uv run pytest -n auto                  # full suite, parallel via pytest-xdist (in the test extra)
 uv run pytest test/test_moi_tests.py -k test_genotype_calls   # single test
 uvx ruff check . && uvx ruff format --check .                 # lint (config in pyproject.toml)
-uvx bump-my-version bump patch         # version bump — touches 7 files, see [tool.bumpversion]
+uv run pre-commit run --all-files      # ruff + mypy + cpg-id-checker, as run by hooks
+uvx bump-my-version bump patch         # version bump — touches 6 files, see [tool.bumpversion]
 uv run --extra docs mkdocs serve       # docs preview
 ```
 
-`-n auto` requires the installation of pytest-xdist, and will parallelise test executions.
-
 One container for every process, built locally, not pulled (`params.container` in `nextflow.config`).
 It carries the Python package, bcftools/htslib, echtvar and SVAFotate; only GATK SVAnnotate runs
-elsewhere, from a public image:
+elsewhere, from a public image (`params.gatk_container`). The tag must match `params.container`:
 
 ```bash
-docker build -t talos:0.0.1 .
+docker build -t talos2:0.4.0 .
 ```
 
 Nextflow entrypoints (all take `-c nextflow.config`):
@@ -98,7 +97,10 @@ or thin invocations of talos2 modules using `python -m talos2.MODULE`. Most modu
    annotated SV VCF) already exists under `${cohort}_annotated/` are reused, not re-annotated —
    delete that directory to force re-annotation. SV path is separate: GATK SVAnnotate → SVAFotate
    → field rename.
-3. **`nextflow/talos.nf`** — cheap, run every cycle. This is where reanalysis happens.
+3. **`nextflow/talos.nf`** — cheap, run every cycle. This is where reanalysis happens. ClinVar is
+   deliberately *not* baked in at annotation time: `AnnotateVcfWithFreshClinvar` applies the
+   current month's ClinvArbitration echtvar zip to every shard each cycle. `StartupChecks` runs on
+   the first shard per cohort before anything else.
 
 `main.nf` runs 2+3 and is the only run entrypoint; reanalysis cycles just re-run it. Annotation
 products publish to `${cohort}_annotated/`, analysis results to `${cohort}_analysis_YYYYMMDD/`.
@@ -107,7 +109,7 @@ products publish to `${cohort}_annotated/`, analysis results to `${cohort}_analy
 
 Two spines, deliberately distinct — get this wrong and processes silently stall:
 
-- `ch_meta` — **one row per cohort**: `[cohort, pedigree, config, history, ext_ids, seqr_map, mito]`
+- `ch_meta` — **one row per cohort**: `[cohort, pedigree, config, history, ext_ids, seqr_map, mito, str]`
 - `ch_shards` — **one row per annotated shard**: `[cohort, vcf]`
 
 Fanning per-cohort metadata across shards uses `combine(..., by: 0)`, never `join` (a join matches
@@ -127,6 +129,9 @@ converge on **`ValidateMOI`**, which is the only stage that sees all of them:
 | Small   | `run_stream_filtering.py`        | per shard, gathered by `ConcatLabelledVcfs` |
 | SV      | `run_sv_filtering.py`            | per cohort                                  |
 | Mito    | `reformat_and_label_mito_vcf.py` | per cohort                                  |
+
+STRs are a fourth, unlabelled input: the `str` TSV column (a `stripy_json_to_vcf.py` VCF) goes straight from
+`ch_meta` to `ValidateMOI --str`, and `create_str_variant` in `utils.py` assigns the `str` category on read.
 
 `validate_moi.py` reads the labelled VCFs, builds pydantic models, and runs `moi_tests.py`;
 `hpo_flagging.py` then annotates phenotype matches, and `create_talos_html.py` renders the report.
@@ -150,7 +155,8 @@ and (details only) parsing in `utils.py` ingestion.
 `models.py` carries `CURRENT_VERSION` and an `ALL_VERSIONS` chain, with one module per hop in
 `src/talos2/liftover/`. Old `ResultData`/`PanelApp` JSON is lifted forward on read
 (`lift_up_model_version`) so reanalysis can consume historical results. **Any breaking change to existing models needs a
-new version, a new liftover module, and a fixture under `test/model_liftovers/`.**
+new version, a new liftover module, and a test in `test/model_liftovers/` (JSON fixtures live in
+`test/input/models/`).**
 
 ### Configuration
 
@@ -162,13 +168,14 @@ Two independent config layers, easy to confuse:
   `config` column of the input TSV.
 - **Nextflow config** — `nextflow.config` (`params` + per-process resources), `docs/NextflowConfiguration.md`.
 
-**Section names lag script renames.** `run_stream_filtering.py` reads `['RunSmallFiltering', ...]`
-and `run_sv_filtering.py` reads both `['RunSvFiltering', ...]` and `['RunSmallFiltering', ...]`. Check
-the actual `config_retrieve` call before adding a key; don't assume the section matches the module.
+**Section names lag script renames.** `run_stream_filtering.py` reads `['RunSmallFiltering', ...]`,
+`run_sv_filtering.py` reads both `['RunSvFiltering', ...]` and `['RunSmallFiltering', ...]`, and
+`unified_panelapp_parser.py` reads `['GeneratePanelData', ...]`. Modules also read sections belonging
+to other stages (e.g. `moi_tests.py` reads `RunSmallFiltering`). Check the actual `config_retrieve`
+call before adding a key; don't assume the section matches the module.
 
 ## Conventions
 
-Ruff, line length 120, **single quotes**, custom isort section `cpg` (`metamist`, `cpg_flow`,
-`cpg_utils`) between third-party and first-party. Logging is `loguru`. Data models are pydantic v2.
+Ruff, line length 120, **single quotes**, broad rule set (see `[tool.ruff.lint]`). Logging is `loguru`. Data models are pydantic v2.
 Python is pinned to `>=3.10,<3.13`. Update `CHANGELOG.md` under the
 `<!--latest-start-->`/`<!--latest-end-->` markers — `docs/index.md` includes that span verbatim.

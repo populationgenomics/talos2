@@ -61,7 +61,7 @@ steps have completed. A full GATK-SV callset carries all of them; a bare gCNV or
 ### Trying it out
 
 `nextflow/inputs/test_sv.tsv` is the SNV test input plus an `sv` column, pointing at a small adversarial SV
-VCF. `nextflow/inputs/test.tsv` deliberately has no `sv` column, so the default test run never requires the
+VCF (it also has an `str` column, see [Short Tandem Repeats](#short-tandem-repeats)). `nextflow/inputs/test.tsv` deliberately has no `sv` column, so the default test run never requires the
 478 MB of SV reference data. Regenerate the test VCF with:
 
 ```bash
@@ -79,3 +79,48 @@ The SVAFotate BED uses Ensembl-style contig names (`1`, not `chr1`), which looks
 Talos. It is correct. SVAFotate strips the `chr` prefix from the query VCF but not from this reference file, so
 adding prefixes causes **every** variant to be annotated with a population frequency of zero, with no error
 raised — making an entire callset appear rare. Use the file exactly as downloaded.
+
+## Short Tandem Repeats
+
+STR data needs no Nextflow parameters or reference files. Supply a multi-sample STR VCF per cohort in the `str` column
+of the input TSV. Leave the column empty, or leave it out altogether, for cohorts with no STR data. The VCF is not
+annotated or filtered first; it goes straight to `ValidateMOI`, alongside the labelled small-variant, SV, and mito
+VCFs.
+
+### Providing the input
+
+The VCF has to be bgzipped. `ValidateMOI` indexes it before reading. Build it from per-sample STRipy JSON reports with:
+
+```bash
+python -m talos2.scripts.stripy_json_to_vcf \
+    --json sample1.json sample2.json ... \
+    --output cohort_str.vcf.bgz \
+    --mapping GRCh38_symbol_to_ensg.json
+```
+
+`--mapping` is the symbol-to-ENSG lookup written to `processed_annotations` by the preparation workflow. It is needed
+because STRs are matched to PanelApp by gene ID, and STRipy only reports a locus name.
+
+Talos reads these fields:
+
+| Field                    | Use                                                                                    |
+|--------------------------|----------------------------------------------------------------------------------------|
+| `INFO/GENE`              | ENSG ID - matched against the PanelApp STR entities on this cohort's panels            |
+| `INFO/LOCUS`             | STRipy locus ID, e.g. `ARX_1` - checked against `ValidateMOI.noisy_strs` in the config |
+| `FORMAT/GT`              | `1` marks an allele in STRipy's pathogenic range, `0` any other allele                 |
+| `FORMAT/REPCN`           | repeat count for each allele, shown in the report                                      |
+| `FORMAT/DISEASE_DETAILS` | per-disease normal/intermediate ranges and pathogenic threshold                        |
+
+The only STR calls that can be reported are those at PanelApp STR entities that pass the cohort's `confidence_level`
+on one of its panels. By default only phenotype-matched and forced panels count, not the `default_panel`. See
+`pheno_match_strs` in [Configuration.md](Configuration.md).
+
+### Trying it out
+
+`nextflow/inputs/test_sv.tsv` includes a `str` column for the `premerged` cohort. It points to a small simulated STR
+VCF, whose cases and expected outcomes are listed in the docstring of the generator. The test config sets
+`pheno_match_strs = false`, as none of the test proband's matched panels carry an STR. Regenerate the VCF with:
+
+```bash
+uv run python nextflow/inputs/generate_str_test_data.py
+```

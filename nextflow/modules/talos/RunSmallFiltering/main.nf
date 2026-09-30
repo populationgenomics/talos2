@@ -1,4 +1,4 @@
-process RunStreamingFiltering {
+process RunSmallFiltering {
     container params.container
 
     // filter and category-label one annotated shard in a single cyvcf2 pass. The MANE JSON is
@@ -18,7 +18,7 @@ process RunStreamingFiltering {
 
         export TALOS_CONFIG=${talos_config}
 
-        python -m talos2.run_stream_filtering \
+        python -m talos2.run_small_filtering \
             --input ${vcf} \
             --panelapp ${panelapp_data} \
             --pedigree ${pedigree} \

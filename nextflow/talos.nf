@@ -7,7 +7,7 @@ include { AnnotateVcfWithFreshClinvar } from './modules/talos/AnnotateVcfWithFre
 include { ConcatLabelledVcfs } from './modules/talos/ConcatLabelledVcfs/main'
 include { UnifiedPanelAppParser } from './modules/talos/UnifiedPanelAppParser/main'
 include { RunSvFiltering } from './modules/talos/RunSvFiltering/main'
-include { RunStreamingFiltering } from './modules/talos/RunStreamingFiltering/main'
+include { RunSmallFiltering } from './modules/talos/RunSmallFiltering/main'
 include { ValidateMOI } from './modules/talos/ValidateMOI/main'
 include { HPOFlagging } from './modules/talos/HPOFlagging/main'
 include { CreateTalosHTML } from './modules/talos/CreateTalosHTML/main'
@@ -18,7 +18,7 @@ workflow TALOS {
 		ch_mane
 		ch_gff
 		ch_ref_genome
-		// one entry per cohort: [cohort, pedigree, config, history, ext_ids, seqr_map, [mito, sv]]
+		// one entry per cohort: [cohort, pedigree, config, history, ext_ids, seqr_map, mito, str]
 		ch_meta
 		// one entry per annotated shard: [cohort, vcf]
 		ch_shards
@@ -66,7 +66,7 @@ workflow TALOS {
     ch_first_shards = ch_shards
         .unique { it[0] }
         .join(ch_meta)
-        .map { cohort, vcf, pedigree, config, _history, _ext, _seqr, _mito ->
+        .map { cohort, vcf, pedigree, config, _history, _ext, _seqr, _mito, _str ->
             tuple(cohort, vcf, pedigree, config)
         }
 
@@ -77,7 +77,7 @@ workflow TALOS {
     // UnifiedPanelAppParser
     ch_panel_app_inputs = StartupChecks.out
         .join(ch_meta)
-        .map { cohort, check_file, pedigree, config, _history, _ext, _seqr, _mito ->
+        .map { cohort, check_file, pedigree, config, _history, _ext, _seqr, _mito, _str ->
             tuple(cohort, check_file, config, pedigree)
         }
 
@@ -97,11 +97,11 @@ workflow TALOS {
     ch_streaming_inputs = AnnotateVcfWithFreshClinvar.out
         .combine(UnifiedPanelAppParser.out, by: 0)
         .combine(ch_meta, by: 0)
-        .map { cohort, vcf, panelapp_data, pedigree, config, _history, _ext, _seqr, _mito ->
+        .map { cohort, vcf, panelapp_data, pedigree, config, _history, _ext, _seqr, _mito, _str ->
             tuple(cohort, vcf, panelapp_data, pedigree, config)
         }
 
-    RunStreamingFiltering(
+    RunSmallFiltering(
         ch_streaming_inputs,
         ch_mane,
         ch_clinvar_pm5,
@@ -109,7 +109,7 @@ workflow TALOS {
 
     // gather the labelled shards back to one VCF per cohort
     ConcatLabelledVcfs(
-        RunStreamingFiltering.out.groupTuple(by: 0),
+        RunSmallFiltering.out.groupTuple(by: 0),
     )
 
     // filter & label any annotated SV VCFs. ch_sv_annotated only carries cohorts that had SV data, so this
@@ -117,7 +117,7 @@ workflow TALOS {
     ch_run_hail_sv_inputs = ch_sv_annotated
         .join(UnifiedPanelAppParser.out)
         .join(ch_meta)
-        .map { cohort, sv_vcf, sv_idx, panelapp_data, pedigree, config, _history, _ext, _seqr, _mito ->
+        .map { cohort, sv_vcf, sv_idx, panelapp_data, pedigree, config, _history, _ext, _seqr, _mito, _str ->
             tuple(cohort, sv_vcf, sv_idx, panelapp_data, pedigree, config)
         }
 
@@ -144,7 +144,7 @@ workflow TALOS {
     ch_mito_joined = ch_meta
         .join(UnifiedPanelAppParser.out)
         .join(StartupChecks.out)
-        .map { cohort, pedigree, config, _history, _ext, _seqr, mito, panelapp_data, _check_file ->
+        .map { cohort, pedigree, config, _history, _ext, _seqr, mito, _str, panelapp_data, _check_file ->
           tuple(cohort, mito, panelapp_data, pedigree, config)
     }
 
@@ -178,8 +178,8 @@ workflow TALOS {
         .join(ch_meta)
         .join(ch_mito_resolved)
         .join(ch_sv_resolved)
-        .map { cohort, labelled_vcf, labelled_vcf_index, panelapp_out, pedigree, config, history, _ext, _seqr, _mito, anno_mito, anno_sv ->
-            tuple(cohort, labelled_vcf, labelled_vcf_index, anno_sv, anno_mito, panelapp_out, pedigree, config, history)
+        .map { cohort, labelled_vcf, labelled_vcf_index, panelapp_out, pedigree, config, history, _ext, _seqr, _mito, str_vcf, anno_mito, anno_sv ->
+            tuple(cohort, labelled_vcf, labelled_vcf_index, anno_sv, anno_mito, str_vcf, panelapp_out, pedigree, config, history)
         }
 
     ValidateMOI(
@@ -191,7 +191,7 @@ workflow TALOS {
     ch_hpo_inputs = ValidateMOI.out
         .join(UnifiedPanelAppParser.out)
         .join(ch_meta)
-        .map { cohort, talos_result_json, panelapp_data, _pedigree, config, _history, _ext, _seqr, _mito ->
+        .map { cohort, talos_result_json, panelapp_data, _pedigree, config, _history, _ext, _seqr, _mito, _str ->
             tuple(cohort, talos_result_json, panelapp_data, config)
         }
 
@@ -206,7 +206,7 @@ workflow TALOS {
     ch_create_html_inputs = HPOFlagging.out
         .join(UnifiedPanelAppParser.out)
         .join(ch_meta)
-        .map { cohort, result_json, panelapp_data, _pedigree, config, _history, ext, seqr, _mito ->
+        .map { cohort, result_json, panelapp_data, _pedigree, config, _history, ext, seqr, _mito, _str ->
             tuple(cohort, result_json, panelapp_data, config, ext, seqr)
         }
 

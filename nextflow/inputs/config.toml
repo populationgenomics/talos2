@@ -1,6 +1,11 @@
 [GeneratePanelData]
+# set this to a negative value to remove any base panel from the analysis
+#default_panel = -1
 default_panel = 137
+
 panelapp = "https://panelapp-aus.org/api/v1/panels"
+
+# add "all" to this list to run a phenotype-match-only analysis (removing the mendeliome/default panel)
 require_pheno_match = [ "FLG", "GJB2", "F2", "F5", "HFE"]
 within_x_months = 24
 forbidden_genes = []
@@ -11,6 +16,10 @@ forced_panels = [ 144, 239]
 # 2 = Amber or Green only
 # 1 = Red, Amber, or Green
 confidence_level = 3
+
+# STRs are phenotype-match only by default. None of the test proband's matched panels carry an STR, so
+# disable that here to let nextflow/inputs/joint_str.vcf.bgz reach ValidateMOI
+pheno_match_strs = false
 
 [[GeneratePanelData.manual_overrides]]
 # this section permits the manual addition of genes to the panel data

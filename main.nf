@@ -103,6 +103,8 @@ workflow {
 			row.ext_ids ? file(row.ext_ids, checkIfExists: true) : [],
 			row.seqr_map ? file(row.seqr_map, checkIfExists: true) : [],
 			row.mito ? file(row.mito, checkIfExists: true) : [],
+			// STR VCFs (from stripy_json_to_vcf) need no annotation, they go straight to ValidateMOI
+			row.str ? file(row.str, checkIfExists: true) : [],
 		) }
 
 	// the SV path is entirely optional, and only wired up if the input TSV declares an `sv` column.
