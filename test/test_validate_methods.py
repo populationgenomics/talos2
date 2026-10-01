@@ -4,7 +4,7 @@ script testing methods within reanalysis/validate_categories.py
 
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.models import (
+from talos.models import (
     Coordinates,
     PanelApp,
     ReportVariant,
@@ -12,8 +12,8 @@ from talos2.models import (
     ResultMeta,
     SmallVariant,
 )
-from talos2.static_values import get_granular_date
-from talos2.validate_moi import count_families, filter_results_to_panels, prepare_results_shell
+from talos.static_values import get_granular_date
+from talos.validate_moi import count_families, filter_results_to_panels, prepare_results_shell
 from test.test_utils import ONE_EXPECTED, THREE_EXPECTED, TWO_EXPECTED, ZERO_EXPECTED
 
 TEST_COORDS = Coordinates(chrom='1', pos=1, ref='A', alt='C')

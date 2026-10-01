@@ -20,8 +20,8 @@ from networkx import dfs_successors
 from networkx.exception import NetworkXError
 from obonet import read_obo
 
-from talos2.config import config_retrieve
-from talos2.models import (
+from talos.config import config_retrieve
+from talos.models import (
     DownloadedPanelApp,
     DownloadedPanelAppGene,
     DownloadedPanelAppStr,
@@ -32,7 +32,7 @@ from talos2.models import (
     ParticipantHPOPanels,
     StrDetail,
 )
-from talos2.utils import read_json_from_path
+from talos.utils import read_json_from_path
 
 PANELAPP_BASE_PANEL = 137
 X_CHROMOSOME = {'X'}

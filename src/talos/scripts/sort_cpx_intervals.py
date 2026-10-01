@@ -24,7 +24,7 @@ and non-coding annotators each iterate the segments and accumulate into a dictio
 applied to `dupINV`/`INVdup`/`dupINVdup`/`delINVdup`/`dupINVdel` re-appends its segment at the end regardless
 of where it started. The fold in `getSegmentForNearestTSS` is the only order-sensitive step, and there the
 sorted order is the one that yields the intended outer-breakpoint span. Talos itself never reads
-`CPX_INTERVALS`; `run_hail_filtering_sv` takes `PREDICTED_LOF` and the joint-call fields.
+`CPX_INTERVALS`; `run_sv_filtering` takes `PREDICTED_LOF` and the joint-call fields.
 
 `delINVdel` is the only subtype observed to trigger this - the others reduce to a single segment, or to a
 pair that is contiguous by construction, before the fold runs. Every record is sorted anyway rather than

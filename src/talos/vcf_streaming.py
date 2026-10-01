@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Any
 from loguru import logger
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.config import config_retrieve
+from talos.config import config_retrieve
 
 if TYPE_CHECKING:
     import cyvcf2
 
-# ClinvArbitration decision strings (see run_hail_filtering.py constants).
+# ClinvArbitration decision strings.
 # ClinvArbitration 3.0.0 shortened its P/LP rating from 'Pathogenic/Likely Pathogenic' to
 # 'Pathogenic', so is_pathogenic matches the shared word rather than comparing for equality -
 # an equality check silently stops labelling anything the next time the wording moves
@@ -81,9 +81,8 @@ def consequences_to_csq_string(consequences: list[dict[str, Any]]) -> str:
     """
     Collapse consequence dicts into the single INFO-ready csq String.
 
-    Field selection and ordering come from config (RunSmallFiltering.csq_string),
-    matching run_hail_filtering.csq_struct_to_string. Absent/None values render
-    as empty strings.
+    Field selection and ordering come from config (RunSmallFiltering.csq_string).
+    Absent/None values render as empty strings.
     """
 
     csq_fields = config_retrieve(['RunSmallFiltering', 'csq_string'])

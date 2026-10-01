@@ -14,7 +14,7 @@ docs/SvAnnotation.md. Coordinates are taken from the real reference data:
   and END = END
 
 Nothing in the annotation chain writes AC, AF, AN, N_HET, N_HOMALT, MALE_AF or FEMALE_AF - they have to be
-present in the joint-called input already, or run_hail_filtering_sv raises at rearrange_annotations(). They
+present in the joint-called input already, or run_sv_filtering raises at rearrange_annotations(). They
 are written here for that reason, with MALE_AF/FEMALE_AF array-typed.
 """
 
@@ -143,7 +143,7 @@ VARIANTS = [
     # matches gnomAD-SV_v3_INS_chr1_3f94b1dc, proving the expansion works
     SV('ins_end_eq_pos', 66340, 66340, 'INS', 161, ['0/1', '0/0', '0/1'], callset_af=0.001),
     # a breakend. SVAnnotate never assigns PREDICTED_LOF to a BND - this one lands intronic in PADI6 and
-    # exonic in GJA9 - so it is dropped by run_hail_filtering_sv before any frequency filter is consulted.
+    # exonic in GJA9 - so it is dropped by run_sv_filtering before any frequency filter is consulted.
     # See the Risks section of docs/SvAnnotation.md
     SV(
         'bnd_1',

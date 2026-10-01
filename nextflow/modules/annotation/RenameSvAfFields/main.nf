@@ -9,7 +9,7 @@ process RenameSvAfFields {
         tuple val(cohort), path("${cohort}_sv_annotated.vcf.bgz"), path("${cohort}_sv_annotated.vcf.bgz.tbi")
 
     script:
-        // the field prefix is read from the Talos config, the same key run_hail_filtering_sv uses, so the
+        // the field prefix is read from the Talos config, the same key run_sv_filtering uses, so the
         // written and expected field names cannot drift apart. SVAFotate wrote an uncompressed VCF, so bgzip
         // and index it here
         """
@@ -17,7 +17,7 @@ process RenameSvAfFields {
 
         export TALOS_CONFIG=${talos_config}
 
-        python -m talos2.scripts.rename_sv_af_fields \
+        python -m talos.scripts.rename_sv_af_fields \
             --input ${vcf} \
             --output ${cohort}_sv_renamed.vcf
 

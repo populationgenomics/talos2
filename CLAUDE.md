@@ -66,7 +66,7 @@ It carries the Python package, bcftools/htslib, echtvar and SVAFotate; only GATK
 elsewhere, from a public image (`params.gatk_container`). The tag must match `params.container`:
 
 ```bash
-docker build -t talos2:0.4.0 .
+docker build -t talos:13.0.0 .
 ```
 
 Nextflow entrypoints (all take `-c nextflow.config`):
@@ -82,8 +82,8 @@ as `params.processed_annotations` — `main.nf` exits if it is.
 
 ## Architecture
 
-Talos is a Nextflow pipeline over a Python package (`src/talos2`). Nextflow modules are either bash commands,
-or thin invocations of talos2 modules using `python -m talos2.MODULE`. Most modules run `export TALOS_CONFIG=...`.
+Talos is a Nextflow pipeline over a Python package (`src/talos`). Nextflow modules are either bash commands,
+or thin invocations of talos modules using `python -m talos.MODULE`. Most modules run `export TALOS_CONFIG=...`.
 
 ### Three workflows
 
@@ -153,7 +153,7 @@ and (details only) parsing in `utils.py` ingestion.
 ### Result versioning
 
 `models.py` carries `CURRENT_VERSION` and an `ALL_VERSIONS` chain, with one module per hop in
-`src/talos2/liftover/`. Old `ResultData`/`PanelApp` JSON is lifted forward on read
+`src/talos/liftover/`. Old `ResultData`/`PanelApp` JSON is lifted forward on read
 (`lift_up_model_version`) so reanalysis can consume historical results. **Any breaking change to existing models needs a
 new version, a new liftover module, and a test in `test/model_liftovers/` (JSON fixtures live in
 `test/input/models/`).**
@@ -163,8 +163,8 @@ new version, a new liftover module, and a test in `test/model_liftovers/` (JSON 
 Two independent config layers, easy to confuse:
 
 - **Talos app config** — a TOML file, located via the `TALOS_CONFIG` env var, read through
-  `talos2/config.py::config_retrieve(['Section', 'key'], default)`. Baseline:
-  `src/talos2/example_config.toml`; reference: `docs/Configuration.md`. Passed per-cohort as the
+  `talos/config.py::config_retrieve(['Section', 'key'], default)`. Baseline:
+  `src/talos/example_config.toml`; reference: `docs/Configuration.md`. Passed per-cohort as the
   `config` column of the input TSV.
 - **Nextflow config** — `nextflow.config` (`params` + per-process resources), `docs/NextflowConfiguration.md`.
 

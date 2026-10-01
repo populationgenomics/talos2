@@ -3,10 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name='talos2'
+name='talos'
 description='Centre for Population Genomics Variant Prioritisation'
 readme = "README.md"
-version="0.5.0"
+version="13.0.0"
 
 # pinned below python 3.13 for compatibility with semsimian
 requires-python = ">=3.10,<3.13"
@@ -68,7 +68,7 @@ sv = [
 Repository = "https://github.com/populationgenomics/talos"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/talos2"]
+packages = ["src/talos"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""
@@ -124,7 +124,7 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.ruff.lint.per-file-ignores]
 
 [tool.bumpversion]
-current_version = "0.5.0"
+current_version = "13.0.0"
 parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
 serialize = ["{major}.{minor}.{patch}"]
 commit = true
@@ -147,7 +147,7 @@ search = "{current_version}"
 replace = "{new_version}"
 
 [[tool.bumpversion.files]]
-filename = "src/talos2/version.py"
+filename = "src/talos/version.py"
 search = "{current_version}"
 replace = "{new_version}"
 
@@ -158,5 +158,5 @@ replace = "{new_version}"
 
 [[tool.bumpversion.files]]
 filename = "docs/getting-started.md"
-search = "talos2:{current_version}"
-replace = "talos2:{new_version}"
+search = "talos:{current_version}"
+replace = "talos:{new_version}"

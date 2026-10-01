@@ -6,7 +6,7 @@ test that model liftover works
 import json
 from os.path import join
 
-from talos2.models import CURRENT_VERSION, HpoTerm, ResultData, lift_up_model_version
+from talos.models import CURRENT_VERSION, HpoTerm, ResultData, lift_up_model_version
 
 
 def test_rd_from_none(test_input_models_path):

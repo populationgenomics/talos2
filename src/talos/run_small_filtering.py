@@ -26,10 +26,10 @@ from cyvcf2 import VCF, Variant, Writer
 from loguru import logger
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.config import config_retrieve
-from talos2.models import PanelApp
-from talos2.utils import get_symbol_to_ensg_mapping, read_json_from_path
-from talos2.vcf_streaming import (
+from talos.config import config_retrieve
+from talos.models import PanelApp
+from talos.utils import get_symbol_to_ensg_mapping, read_json_from_path
+from talos.vcf_streaming import (
     BENIGN,
     MISSING_STRING,
     consequences_to_csq_string,
@@ -297,7 +297,7 @@ def is_confident_benign(significance: str, stars: int) -> bool:
 
 
 def clinvar_category_flags(significance: str, stars: int, gene_ids: set[str], new_genes: set[str]) -> dict[str, int]:
-    """The ClinVar-derived flags: talos2 (P/LP any stars), plp (1+ stars), 0star, 0star-in-new-gene."""
+    """The ClinVar-derived flags: clinvar_talos (P/LP any stars), plp (1+ stars), 0star, 0star-in-new-gene."""
     pathogenic = is_pathogenic(significance)
     return {
         'clinvar_talos': int(pathogenic),

@@ -20,7 +20,7 @@ def main(input_mitimpact: str, output: str):
         with (
             mitimpact_opened.open(filename, 'r') as handle,
             gzip.open(output, 'wt') as out,
-            (resources.files('talos2') / 'vcf_headers' / 'mitimpact_header.txt').open() as head_in,
+            (resources.files('talos') / 'vcf_headers' / 'mitimpact_header.txt').open() as head_in,
         ):
             # transcribe the required header
             for header_line in head_in:

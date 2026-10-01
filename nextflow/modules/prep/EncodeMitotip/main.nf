@@ -11,10 +11,10 @@ process EncodeMitotip {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.parse_mitotip \
+        python -m talos.scripts.parse_mitotip \
             --input ${tsv} \
             --output mitotip.vcf.gz
 
-        echtvar encode mitotip.zip /talos2/echtvar/mitotip_config.json mitotip.vcf.gz
+        echtvar encode mitotip.zip /talos/echtvar/mitotip_config.json mitotip.vcf.gz
         """
 }

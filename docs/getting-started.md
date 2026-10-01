@@ -49,12 +49,12 @@ For Nextflow deployments which allow for `-output-dir` to be used as a parameter
 To build the Docker image:
 
 ```
-docker build -t talos2:0.5.0 .
+docker build -t talos:13.0.0 .
 ```
 
 ### **2. Download Annotation Resources**
 
-Talos requires several large external resources (e.g. reference genome, gnomAD, AlphaMissense, Phenotype data). These are expected in a `large_files` directory. The script [large_files/gather_files.sh](https://github.com/populationgenomics/talos2/blob/main/large_files/gather_files.sh) will handle the download of all required resources.
+Talos requires several large external resources (e.g. reference genome, gnomAD, AlphaMissense, Phenotype data). These are expected in a `large_files` directory. The script [large_files/gather_files.sh](https://github.com/populationgenomics/talos/blob/main/large_files/gather_files.sh) will handle the download of all required resources.
 
 ### **3. Run Preparation Workflow**
 
@@ -78,7 +78,7 @@ The inputs for the Talos workflow are:
 - **path**: path to the Cohort's input data (VCF)
 - **type**: type of the input data, see below
 - **pedigree**: path to a Pedigree for the cohort, See details [here](Pedigree.md)
-- **config**: default available, path to the Talos config - see [example_config.toml](https://github.com/populationgenomics/talos2/blob/main/src/talos2/example_config.toml) for an example, and the [Configuration README](Configuration.md) for a full breakdown of all config parameters
+- **config**: default available, path to the Talos config - see [example_config.toml](https://github.com/populationgenomics/talos/blob/main/src/talos/example_config.toml) for an example, and the [Configuration README](Configuration.md) for a full breakdown of all config parameters
 - **history**: optional, path to previous results
 - **ext_ids**: optional, path to ID mapping to present alternate IDs in the HTML report
 - **seqr_map**: optional, path to ID mapping to generate hyperlinks to Seqr in the HTML report
@@ -97,7 +97,7 @@ The input TSV uses two columns to locate variant input; `path` and `type`. `path
 
 Workflow outputs are written per cohort: annotation products (annotated VCF shards, a shard manifest, and the annotated SV VCF where relevant) to `{workflow.outputDir}/{cohort}_annotated`, and analysis results to a dated `{workflow.outputDir}/{cohort}_analysis_YYYYMMDD`. The output directory should be outside this repository, though for demonstration purposes the default is `./nextflow`.
 
-The [main.nf](https://github.com/populationgenomics/talos2/blob/main/main.nf) workflow runs annotation and analysis together. Annotation is skipped for any cohort whose shard manifest already exists in `{cohort}_annotated`, so the same command is used for the first run and for every reanalysis cycle:
+The [main.nf](https://github.com/populationgenomics/talos/blob/main/main.nf) workflow runs annotation and analysis together. Annotation is skipped for any cohort whose shard manifest already exists in `{cohort}_annotated`, so the same command is used for the first run and for every reanalysis cycle:
 
 ```bash
 nextflow \

@@ -9,9 +9,9 @@ from typing import ClassVar
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import GeneDetail, PanelApp
-from talos2.reformat_and_label_mito_vcf import main as mito_main
-from talos2.vcf_streaming import (
+from talos.models import GeneDetail, PanelApp
+from talos.reformat_and_label_mito_vcf import main as mito_main
+from talos.vcf_streaming import (
     PATHOGENIC,
     consequences_to_csq_string,
     normalise_chrom,
@@ -149,7 +149,7 @@ def test_parse_bcsq_non_numeric_aa_change():
 
 
 def test_consequences_to_csq_string(monkeypatch):
-    monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', lambda _key: CSQ_STRING_CONFIG)
+    monkeypatch.setattr('talos.vcf_streaming.config_retrieve', lambda _key: CSQ_STRING_CONFIG)
     csq_string = consequences_to_csq_string(
         [
             {
@@ -169,7 +169,7 @@ def test_consequences_to_csq_string(monkeypatch):
 
 
 def test_consequences_to_csq_string_multiple(monkeypatch):
-    monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', lambda _key: ['consequence', 'gene'])
+    monkeypatch.setattr('talos.vcf_streaming.config_retrieve', lambda _key: ['consequence', 'gene'])
     csq_string = consequences_to_csq_string(
         [{'consequence': 'missense', 'gene': 'A'}, {'consequence': 'synonymous', 'gene': 'B'}],
     )
@@ -203,7 +203,7 @@ class TestMitoMain:
         return list(VCF(out_path))
 
     def test_pathogenic_green_variant_is_kept(self, tmp_path, monkeypatch):
-        monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', fake_config_retrieve)
+        monkeypatch.setattr('talos.vcf_streaming.config_retrieve', fake_config_retrieve)
         variants = self.run_mito(
             tmp_path,
             vcf_rows=[
@@ -221,7 +221,7 @@ class TestMitoMain:
         assert variant.INFO['clinvar_significance'] == PATHOGENIC
         assert variant.INFO['gene_id'] == 'ENSG0001'
         assert variant.INFO['gnomad_AC'] == 0
-        # BCSQ is replaced by the talos2-formatted csq string, with the panelapp-derived gene_id
+        # BCSQ is replaced by the talos-formatted csq string, with the panelapp-derived gene_id
         assert variant.INFO.get('BCSQ') is None
         assert variant.INFO['csq'] == 'missense|ENSG0001|MT-ND1|TX1|||protein_coding|100A>G|62M>62V|62|||'
 
@@ -266,7 +266,7 @@ class TestMitoMain:
         assert not variants
 
     def test_variant_in_two_green_genes_is_exploded(self, tmp_path, monkeypatch):
-        monkeypatch.setattr('talos2.vcf_streaming.config_retrieve', fake_config_retrieve)
+        monkeypatch.setattr('talos.vcf_streaming.config_retrieve', fake_config_retrieve)
         variants = self.run_mito(
             tmp_path,
             vcf_rows=[
