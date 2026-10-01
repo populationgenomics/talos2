@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * STRs are detected on each individual panel, instead of all being sourced from the 'repeat disorders' holding panel
   * By default, STR analysis is only done for phenotype-matched individuals
 
+## Fixed
+
+  * GATK SVAnnotate only works with symbolic alleles. `SortCpxIntervals` is renamed `PrepareSvForSvAnnotate`, and now also removes any SV record with a non-symbolic ALT before annotation, logging each removed record. Update any `withName: SortCpxIntervals` resource blocks accordingly
+
 [0.4.0] - 2026-09
 
 ### Added

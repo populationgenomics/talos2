@@ -25,7 +25,7 @@ include { AnnotateSvWithGatk } from './modules/annotation/AnnotateSvWithGatk/mai
 include { AnnotateSvWithSvafotate } from './modules/annotation/AnnotateSvWithSvafotate/main'
 include { CreateSequenceDictionary } from './modules/prep/CreateSequenceDictionary/main'
 include { RenameSvAfFields } from './modules/annotation/RenameSvAfFields/main'
-include { SortCpxIntervals } from './modules/annotation/SortCpxIntervals/main'
+include { PrepareSvForSvAnnotate } from './modules/annotation/PrepareSvForSvAnnotate/main'
 
 
 workflow SV_ANNOTATION {
@@ -98,10 +98,11 @@ workflow SV_ANNOTATION {
         ch_ref_dict = channel.fromPath(params.ref_dict, checkIfExists: true).first()
     }
     // SVAnnotate aborts the entire run on the first complex variant whose CPX_INTERVALS are not in
-    // coordinate order, which GATK-SV's delINVdel records never are - so sort them before GATK sees them
-    SortCpxIntervals(ch_pending_vcfs)
+    // coordinate order, which GATK-SV's delINVdel records never are - so sort them before GATK sees them.
+    // SVAnnotate also only works with symbolic alleles, so the same pass removes any non-symbolic ALT record
+    PrepareSvForSvAnnotate(ch_pending_vcfs)
     AnnotateSvWithGatk(
-        SortCpxIntervals.out,
+        PrepareSvForSvAnnotate.out,
         ch_mane_gtf,
         ch_noncoding_bed,
         ch_ref_dict,
