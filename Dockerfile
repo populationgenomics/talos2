@@ -5,7 +5,7 @@
 # was python < 3.12
 # As a result SVAFotate has been forked and rewritten, we install that version.
 #
-# build with "docker build -t talos2:13.0.0 ."
+# build with "docker build -t talos:13.0.0 ."
 
 FROM python:3.12-slim-trixie AS base
 
@@ -69,7 +69,7 @@ ENV UV_COMPILE_BYTECODE=1
 # Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
 
-WORKDIR /talos2
+WORKDIR /talos
 
 # Install the project's dependencies using the lockfile and settings
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -78,7 +78,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --all-extras --frozen --no-install-project --no-dev
 
 # Place executables in the environment at the front of the path
-ENV PATH="/talos2/.venv/bin:$PATH"
+ENV PATH="/talos/.venv/bin:$PATH"
 
 # Add in the additional requirements that are most likely to change.
 COPY LICENSE pyproject.toml uv.lock README.md ./
@@ -88,7 +88,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # both halves of the image have to survive each other's install - the Talos package and its cyvcf2,
 # and the SVAFotate CLI. Cheap, and the failure mode it catches is otherwise a runtime one
-RUN python -c "import talos2, cyvcf2" && \
+RUN python -c "import talos, cyvcf2" && \
     bcftools --version && \
     tabix --version && \
     echtvar --version && \

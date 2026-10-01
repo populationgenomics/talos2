@@ -18,9 +18,9 @@ from cyvcf2 import VCFReader
 from loguru import logger
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.config import config_retrieve
-from talos2.exclusion_log import get_exclusion_logger
-from talos2.models import (
+from talos.config import config_retrieve
+from talos.exclusion_log import get_exclusion_logger
+from talos.models import (
     FamilyMembers,
     GeneDetail,
     MemberSex,
@@ -35,8 +35,8 @@ from talos2.models import (
     ShortTandemRepeat,
     translate_category,
 )
-from talos2.moi_tests import MOIRunner
-from talos2.utils import (
+from talos.moi_tests import MOIRunner
+from talos.utils import (
     GeneDict,
     annotate_variant_dates_using_prior_results,
     canonical_contigs_from_vcf,
@@ -46,7 +46,7 @@ from talos2.utils import (
     polish_exomiser_results,
     read_json_from_path,
 )
-from talos2.version import __version__
+from talos.version import __version__
 
 AMBIGUOUS_FLAG = 'Ambiguous Cat.1 MOI'
 MALE_FEMALE = {

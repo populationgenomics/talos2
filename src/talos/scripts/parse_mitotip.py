@@ -15,7 +15,7 @@ def main(input_mitotip: str, output: str):
     with (
         open(input_mitotip) as handle,
         gzip.open(output, 'wt') as out,
-        (resources.files('talos2') / 'vcf_headers' / 'mitotip_header.txt').open() as head_in,
+        (resources.files('talos') / 'vcf_headers' / 'mitotip_header.txt').open() as head_in,
     ):
         for line in head_in:
             out.write(line)

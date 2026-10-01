@@ -10,7 +10,7 @@ Talos. The specific annotations are:
 
 - gene consequences, using GATK SVAnnotate against the MANE GTF. PREDICTED_LOF is the field Talos requires
 - gnomAD v4.1 population frequencies, using SVAFotate against its published popAF BED
-- a rename of SVAFotate's field names to the ones talos.run_hail_filtering_sv reads
+- a rename of SVAFotate's field names to the ones talos.run_sv_filtering reads
 
 This is deliberately separate from the ANNOTATION workflow rather than a branch inside it. That workflow's
 normalise, region-filter, split and echtvar steps are all SNV-specific and would each need bypassing, and the

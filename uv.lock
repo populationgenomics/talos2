@@ -1996,8 +1996,8 @@ wheels = [
 ]
 
 [[package]]
-name = "talos2"
-version = "0.5.0"
+name = "talos"
+version = "13.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

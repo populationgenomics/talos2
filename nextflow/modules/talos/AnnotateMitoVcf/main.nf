@@ -41,7 +41,7 @@ process AnnotateMitoVcf {
 
         export TALOS_CONFIG=${talos_config}
 
-        python -m talos2.reformat_and_label_mito_vcf \\
+        python -m talos.reformat_and_label_mito_vcf \\
             --input "${cohort}_mito_all_annotated.vcf.bgz" \\
             --output "${cohort}_mito_labelled.vcf.bgz" \\
             --pedigree ${pedigree} \\

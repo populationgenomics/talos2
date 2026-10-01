@@ -7,8 +7,8 @@ pedigree-input data overlap
 import pytest
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2 import startup_checks
-from talos2.startup_checks import check_vcf, validate_pedigree
+from talos import startup_checks
+from talos.startup_checks import check_vcf, validate_pedigree
 
 BCSQ_HEADER_LINE = (
     '##INFO=<ID=BCSQ,Number=.,Type=String,Description="Local consequence annotation from BCFtools/csq, '

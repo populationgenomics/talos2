@@ -27,7 +27,7 @@ process ValidateMOI {
         ${sv_idx}
         ${str_idx}
 
-        python -m talos2.validate_moi \
+        python -m talos.validate_moi \
             --labelled_vcf ${labelled_vcf} \
             --panelapp ${panelapp} \
             --pedigree ${pedigree} \

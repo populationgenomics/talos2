@@ -11,24 +11,24 @@ from loguru import logger
 from packaging.version import Version
 from pydantic import BaseModel, Field
 
-from talos2.liftover.lift_1_0_0_to_1_0_1 import resultdata as rd_100_to_101
-from talos2.liftover.lift_1_0_2_to_1_0_3 import resultdata as rd_102_to_103
-from talos2.liftover.lift_1_0_3_to_1_1_0 import resultdata as rd_103_to_110
-from talos2.liftover.lift_1_1_0_to_1_2_0 import resultdata as rd_110_to_120
-from talos2.liftover.lift_1_2_0_to_2_0_0 import panelapp as pa_120_to_200
-from talos2.liftover.lift_1_2_0_to_2_0_0 import resultdata as rd_120_to_200
-from talos2.liftover.lift_2_0_0_to_2_1_0 import panelapp as pa_200_to_210
-from talos2.liftover.lift_2_0_0_to_2_1_0 import resultdata as rd_200_to_210
-from talos2.liftover.lift_2_1_0_to_2_2_0 import dl_panelapp as dl_pa_210_to_220
-from talos2.liftover.lift_2_1_0_to_2_2_0 import resultdata as rd_210_to_220
-from talos2.liftover.lift_2_2_0_to_2_3_0 import dl_panelapp as dl_pa_220_to_230
-from talos2.liftover.lift_2_2_0_to_2_3_0 import panelapp as pa_220_to_230
-from talos2.liftover.lift_2_3_0_to_2_4_0 import dl_panelapp as dl_pa_230_to_240
-from talos2.liftover.lift_2_3_0_to_2_4_0 import panelapp as pa_230_to_240
-from talos2.liftover.lift_2_4_0_to_2_5_0 import panelapp as pa_240_to_250
-from talos2.liftover.lift_2_4_0_to_2_5_0 import resultdata as rd_240_to_250
-from talos2.liftover.lift_none_to_1_0_0 import resultdata as rd_none_to_1_0_0
-from talos2.static_values import get_granular_date
+from talos.liftover.lift_1_0_0_to_1_0_1 import resultdata as rd_100_to_101
+from talos.liftover.lift_1_0_2_to_1_0_3 import resultdata as rd_102_to_103
+from talos.liftover.lift_1_0_3_to_1_1_0 import resultdata as rd_103_to_110
+from talos.liftover.lift_1_1_0_to_1_2_0 import resultdata as rd_110_to_120
+from talos.liftover.lift_1_2_0_to_2_0_0 import panelapp as pa_120_to_200
+from talos.liftover.lift_1_2_0_to_2_0_0 import resultdata as rd_120_to_200
+from talos.liftover.lift_2_0_0_to_2_1_0 import panelapp as pa_200_to_210
+from talos.liftover.lift_2_0_0_to_2_1_0 import resultdata as rd_200_to_210
+from talos.liftover.lift_2_1_0_to_2_2_0 import dl_panelapp as dl_pa_210_to_220
+from talos.liftover.lift_2_1_0_to_2_2_0 import resultdata as rd_210_to_220
+from talos.liftover.lift_2_2_0_to_2_3_0 import dl_panelapp as dl_pa_220_to_230
+from talos.liftover.lift_2_2_0_to_2_3_0 import panelapp as pa_220_to_230
+from talos.liftover.lift_2_3_0_to_2_4_0 import dl_panelapp as dl_pa_230_to_240
+from talos.liftover.lift_2_3_0_to_2_4_0 import panelapp as pa_230_to_240
+from talos.liftover.lift_2_4_0_to_2_5_0 import panelapp as pa_240_to_250
+from talos.liftover.lift_2_4_0_to_2_5_0 import resultdata as rd_240_to_250
+from talos.liftover.lift_none_to_1_0_0 import resultdata as rd_none_to_1_0_0
+from talos.static_values import get_granular_date
 
 NON_HOM_CHROM = ['X', 'Y', 'MT', 'M']
 CHROM_ORDER = list(map(str, range(1, 23))) + NON_HOM_CHROM

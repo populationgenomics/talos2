@@ -18,8 +18,8 @@ from typing import Any
 
 from loguru import logger
 
-from talos2.config import config_retrieve
-from talos2.models import VARIANT_MODELS
+from talos.config import config_retrieve
+from talos.models import VARIANT_MODELS
 
 _logger: 'ExclusionLogger | None' = None
 

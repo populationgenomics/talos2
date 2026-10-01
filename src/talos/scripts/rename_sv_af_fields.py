@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 """
-Rename SVAFotate's population-frequency INFO fields to the names talos2.run_hail_filtering_sv reads.
+Rename SVAFotate's population-frequency INFO fields to the names talos.run_sv_filtering reads.
 
 SVAFotate writes `Max_AF`, and with `-a best` also `Best_gnomAD_ID` and `gnomAD_Count`.
-`talos2.run_hail_filtering_sv` reads `{prefix}_sv_AF` and `{prefix}_sv_SVID`, where `{prefix}` is
+`talos.run_sv_filtering` reads `{prefix}_sv_AF` and `{prefix}_sv_SVID`, where `{prefix}` is
 `RunSvFiltering.gnomad_population`. Reading that prefix from the same config key both sides use keeps the
 written and expected field names from drifting apart.
 
@@ -30,7 +30,7 @@ from argparse import ArgumentParser
 from cyvcf2 import VCF, Writer
 from loguru import logger
 
-from talos2.config import config_retrieve
+from talos.config import config_retrieve
 
 GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4.1')
 
@@ -39,7 +39,7 @@ SVAFOTATE_AF = 'Max_AF'
 SVAFOTATE_SVID = 'Best_gnomAD_ID'
 SVAFOTATE_COUNT = 'gnomAD_Count'
 
-# the names run_hail_filtering_sv reads, derived from the configured population prefix
+# the names run_sv_filtering reads, derived from the configured population prefix
 TALOS_AF = f'{GNOMAD_POP}_sv_AF'
 TALOS_SVID = f'{GNOMAD_POP}_sv_SVID'
 

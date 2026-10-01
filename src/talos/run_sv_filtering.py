@@ -14,10 +14,10 @@ from typing import Any
 from cyvcf2 import VCF, Writer
 from loguru import logger
 
-from talos2.config import config_retrieve
-from talos2.models import PanelApp
-from talos2.utils import get_symbol_to_ensg_mapping, read_json_from_path
-from talos2.vcf_streaming import (
+from talos.config import config_retrieve
+from talos.models import PanelApp
+from talos.utils import get_symbol_to_ensg_mapping, read_json_from_path
+from talos.vcf_streaming import (
     first_value,
     header_has_field,
     parse_pedigree,

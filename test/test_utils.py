@@ -7,14 +7,14 @@ from copy import deepcopy
 from cyvcf2 import VCFReader
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.models import (
+from talos.models import (
     Coordinates,
     ReportVariant,
     ResultData,
     SmallVariant,
 )
-from talos2.static_values import get_granular_date
-from talos2.utils import (
+from talos.static_values import get_granular_date
+from talos.utils import (
     annotate_variant_dates_using_prior_results,
     find_comp_hets,
     gather_gene_dict_from_contig,

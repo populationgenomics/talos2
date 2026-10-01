@@ -1,6 +1,6 @@
 import asyncio
 
-from talos2.download_panelapp import (
+from talos.download_panelapp import (
     PANEL_TEMPLATE_URL,
     PANELS_ENDPOINT,
     get_latest_ensembl_data,
@@ -9,10 +9,10 @@ from talos2.download_panelapp import (
     parse_panel,
     parse_panel_activity,
 )
-from talos2.liftover.lift_2_2_0_to_2_3_0 import dl_panelapp as dl_pa_220_to_230
-from talos2.liftover.lift_2_3_0_to_2_4_0 import dl_panelapp as dl_pa_230_to_240
-from talos2.liftover.lift_2_3_0_to_2_4_0 import panelapp as pa_230_to_240
-from talos2.models import (
+from talos.liftover.lift_2_2_0_to_2_3_0 import dl_panelapp as dl_pa_220_to_230
+from talos.liftover.lift_2_3_0_to_2_4_0 import dl_panelapp as dl_pa_230_to_240
+from talos.liftover.lift_2_3_0_to_2_4_0 import panelapp as pa_230_to_240
+from talos.models import (
     CURRENT_VERSION,
     DownloadedPanelApp,
     DownloadedPanelAppPanel,

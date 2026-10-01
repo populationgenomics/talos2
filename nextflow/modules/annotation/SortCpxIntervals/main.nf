@@ -16,7 +16,7 @@ process SortCpxIntervals {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.sort_cpx_intervals \
+        python -m talos.scripts.sort_cpx_intervals \
             --input ${vcf} \
             --output ${cohort}_cpx_sorted.vcf
 

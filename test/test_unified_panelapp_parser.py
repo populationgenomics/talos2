@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from obonet import read_obo
 
-from talos2.models import (
+from talos.models import (
     CURRENT_VERSION,
     DownloadedPanelApp,
     DownloadedPanelAppGene,
@@ -14,8 +14,8 @@ from talos2.models import (
     PanelShort,
     ParticipantHPOPanels,
 )
-from talos2.static_values import get_granular_date
-from talos2.unified_panelapp_parser import (
+from talos.static_values import get_granular_date
+from talos.unified_panelapp_parser import (
     CUSTOM_PANEL_CONFIDENCE,
     CUSTOM_PANEL_ID,
     ORDERED_MOIS,
@@ -231,7 +231,7 @@ def test_fetch_genes_for_panels_includes_amber_when_threshold_lowered():
     )
     papp = PanelApp(participants={'S1': ParticipantHPOPanels(panels={panel_id})})
 
-    with patch('talos2.unified_panelapp_parser.MIN_GENE_CONFIDENCE', 2):
+    with patch('talos.unified_panelapp_parser.MIN_GENE_CONFIDENCE', 2):
         fetch_genes_for_panels(panelapp_data=papp, cached_panelapp=cached)
 
     assert 'GREEN' in papp.genes

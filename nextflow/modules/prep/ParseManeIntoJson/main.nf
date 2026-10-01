@@ -11,7 +11,7 @@ process ParseManeIntoJson {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.parse_mane_into_json \
+        python -m talos.scripts.parse_mane_into_json \
             --input ${mane_summary} \
             --output mane.json
         """
