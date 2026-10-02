@@ -58,7 +58,7 @@ uv run pytest test/test_moi_tests.py -k test_genotype_calls   # single test
 uvx ruff check . && uvx ruff format --check .                 # lint (config in pyproject.toml)
 uv run pre-commit run --all-files      # ruff + mypy + cpg-id-checker, as run by hooks
 uvx bump-my-version bump patch         # version bump — touches 6 files, see [tool.bumpversion]
-uv run --extra docs mkdocs serve       # docs preview
+uv run --extra docs mkdocs serve       # docs preview (CI runs `mkdocs build --strict`)
 ```
 
 One container for every process, built locally, not pulled (`params.container` in `nextflow.config`).
@@ -126,11 +126,11 @@ converge on **`ValidateMOI`**, which is the only stage that sees all of them:
 
 | Stream  | Script                           | Scatter                                     |
 |---------|----------------------------------|---------------------------------------------|
-| Small   | `run_stream_filtering.py`        | per shard, gathered by `ConcatLabelledVcfs` |
+| Small   | `run_small_filtering.py`         | per shard, gathered by `ConcatLabelledVcfs` |
 | SV      | `run_sv_filtering.py`            | per cohort                                  |
 | Mito    | `reformat_and_label_mito_vcf.py` | per cohort                                  |
 
-STRs are a fourth, unlabelled input: the `str` TSV column (a `stripy_json_to_vcf.py` VCF) goes straight from
+STRs are a fourth, unlabelled input: the `str` TSV column (a `scripts/stripy_json_to_vcf.py` VCF) goes straight from
 `ch_meta` to `ValidateMOI --str`, and `create_str_variant` in `utils.py` assigns the `str` category on read.
 
 `validate_moi.py` reads the labelled VCFs, builds pydantic models, and runs `moi_tests.py`;
@@ -147,7 +147,7 @@ field whose **name encodes its semantics** (see `docs/AddingNewCategories.md`):
 - `categorydetails<NAME>` — bespoke payload parsed on ingestion into boolean/sample + `info` dict (e.g. PM5)
 
 Downstream code branches on these prefixes. Adding a category means: config entry, a self-contained
-labelling function in `run_stream_filtering.py` (or the mito/SV equivalent), a call site, inclusion in the filter,
+labelling function in `run_small_filtering.py` (or the mito/SV equivalent), a call site, inclusion in the filter,
 and (details only) parsing in `utils.py` ingestion.
 
 ### Result versioning
@@ -168,10 +168,9 @@ Two independent config layers, easy to confuse:
   `config` column of the input TSV.
 - **Nextflow config** — `nextflow.config` (`params` + per-process resources), `docs/NextflowConfiguration.md`.
 
-**Section names lag script renames.** `run_stream_filtering.py` reads `['RunSmallFiltering', ...]`,
-`run_sv_filtering.py` reads both `['RunSvFiltering', ...]` and `['RunSmallFiltering', ...]`, and
-`unified_panelapp_parser.py` reads `['GeneratePanelData', ...]`. Modules also read sections belonging
-to other stages (e.g. `moi_tests.py` reads `RunSmallFiltering`). Check the actual `config_retrieve`
+**Section names don't map 1:1 to modules.** `unified_panelapp_parser.py` reads `['GeneratePanelData', ...]`
+(plus `PanelApp`), `run_sv_filtering.py` reads both `RunSvFiltering` and `RunSmallFiltering`, and
+`run_small_filtering.py`/`moi_tests.py` both read `RunSmallFiltering` and `ValidateMOI`. Check the actual `config_retrieve`
 call before adding a key; don't assume the section matches the module.
 
 ## Conventions
