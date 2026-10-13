@@ -146,15 +146,17 @@ def test_diploidise_genotypes():
 
 
 def test_matching_regions():
-    """a CNV matches a region only if the type matches and the reciprocal overlap meets the required %"""
+    """a CNV matches a region only if the type matches and it overlaps the required % of the region"""
     regions = [
         RegionDetail(name='LOSS', chrom='1', start=1000, end=2000, variant_type='cnv_loss', required_overlap=80),
         RegionDetail(name='BOTH', chrom='1', start=1000, end=2000, variant_type='cnv_both', required_overlap=50),
     ]
     # DEL 90% of region, 100% of CNV -> both
     assert matching_regions('chr1', 1000, 1900, 'DEL', regions) == {'LOSS', 'BOTH'}
-    # DEL 100% of region, but only 50% of CNV -> BOTH only, CNV too large for LOSS's 80%
-    assert matching_regions('chr1', 1000, 3000, 'DEL', regions) == {'BOTH'}
+    # DEL 100% of region, only 50% of CNV -> both, CNV size doesn't matter
+    assert matching_regions('chr1', 1000, 3000, 'DEL', regions) == {'LOSS', 'BOTH'}
+    # DEL 70% of region -> BOTH only, too small for LOSS's 80%
+    assert matching_regions('chr1', 1000, 1700, 'DEL', regions) == {'BOTH'}
     # DUP 90% of region -> BOTH only, wrong type for LOSS
     assert matching_regions('1', 1100, 2000, 'DUP', regions) == {'BOTH'}
     # elsewhere, wrong contig, or no END -> none

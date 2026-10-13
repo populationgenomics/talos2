@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
   * PanelApp CNV regions tagged `regulatory region` are downloaded and carried through to the parsed PanelApp data
-  * `run_sv_filtering.py` labels rare DEL/DUP CNVs matching a region's type (`cnv_loss`/`cnv_gain`/`cnv_both`) with at least the region's required reciprocal overlap as `categorybooleanregulatorycnv`. Each match gets its own row, using the region name as the gene ID, so region matches are retained without any gene annotation, and are never paired with gene variants as comp-hets
+  * `run_sv_filtering.py` labels rare DEL/DUP CNVs matching a region's type (`cnv_loss`/`cnv_gain`/`cnv_both`) overlapping at least the region's required % of the region (CNV size doesn't matter) as `categorybooleanregulatorycnv`. Each match gets its own row, using the region name as the gene ID, so region matches are retained without any gene annotation, and are never paired with gene variants as comp-hets
   * The report shows region name, location, type, observed overlap and MOI for region matches
   * `generate_sv_test_data.py` adds a positive (DUP) and negative (DEL) control for the IHH upstream regulatory region, on panel 93, now forced in `nextflow/inputs/config.toml`
 
