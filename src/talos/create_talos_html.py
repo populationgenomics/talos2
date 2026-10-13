@@ -32,6 +32,7 @@ from talos.models import (
     ResultData,
     ShortTandemRepeat,
     SmallVariant,
+    StrDetail,
     StructuralVariant,
 )
 from talos.static_values import get_granular_date
@@ -55,7 +56,7 @@ GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4
 # emoji source https://tools.picsart.com/text/emojis/
 CONFIDENCE_EMOJI: dict[int, str] = {3: '🟢', 2: '🟡', 1: '🔴'}
 REASON_EMOJIS = {
-    'new': '🆕',
+    'new': '➕',  # noqa: RUF001
     'clinvar': '💫',
     'pheno': '🎯',
     'green': '🚦',
@@ -639,9 +640,13 @@ class Variant:
 
         # List of (gene_id, symbol, panel_confidence_tooltip_html)
         self.genes: list[tuple[str, str, str]] = []
+        # STRs are rated separately to their gene in PanelApp, so use the STR-specific panel confidences
+        is_str = isinstance(self.var_data, ShortTandemRepeat)
         for gene_id in report_variant.gene.split(','):
-            gene_panelapp_entry: GeneDetail | RegionDetail
-            if gene_id in html_builder.panelapp.regions:
+            gene_panelapp_entry: GeneDetail | StrDetail | RegionDetail
+            if is_str:
+                gene_panelapp_entry = html_builder.panelapp.strs.get(gene_id, StrDetail(symbol=gene_id))
+            elif gene_id in html_builder.panelapp.regions:
                 gene_panelapp_entry = html_builder.panelapp.regions[gene_id]
                 # carried in the variant data, for display in the expanded row details
                 self.var_data.info['panelapp_region'] = gene_panelapp_entry.model_dump(mode='json')
@@ -669,7 +674,7 @@ class Variant:
             )
             self.genes.append((gene_id, symbol, '<br>'.join(tooltip_parts)))
 
-            # is this a new gene? region green dates aren't currently parsed from PanelApp activity
+            # is this a new gene? STR and region green dates aren't currently parsed from PanelApp activity
             new_panels = gene_panelapp_entry.new if isinstance(gene_panelapp_entry, GeneDetail) else set()
 
             if html_builder.base_panel in new_panels:
