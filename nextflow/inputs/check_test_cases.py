@@ -21,8 +21,8 @@ import json
 import sys
 from pathlib import Path
 
-from talos2.models import ResultData
-from talos2.utils import read_json_from_path
+from talos.models import ResultData
+from talos.utils import read_json_from_path
 
 
 def strip_chr(variant: str) -> str:

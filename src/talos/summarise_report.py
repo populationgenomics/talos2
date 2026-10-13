@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-A standalone script to read some talos2 report files, and summarise the number of affected samples involved
+A standalone script to read some talos report files, and summarise the number of affected samples involved
 
 Allows for the printing of affected participants grouped by a portion of the family ID
 Examples are when the family  ID is prefixed with the year, e.g. 19DNAXXXX for 2019
@@ -16,8 +16,8 @@ from collections import Counter, defaultdict
 
 from cloudpathlib.anypath import to_anypath
 
-from talos2.models import ResultData
-from talos2.utils import read_json_from_path
+from talos.models import ResultData
+from talos.utils import read_json_from_path
 
 MEAN_SLASH_SAMPLE = 'Mean/sample'
 

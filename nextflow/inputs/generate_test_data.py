@@ -2,7 +2,7 @@
 script used to create an artificial VCF for testing
 
 Hand-writes the joint-called trio VCF and its three single-sample derivatives directly, in the
-same style as generate_sv_test_data.py. Hail and talos2.data_model have both been deleted, but the
+same style as generate_sv_test_data.py. Hail and talos.data_model have both been deleted, but the
 annotation payload they used to attach (VEP consequences, gnomAD, ClinVar, SpliceAI) never actually
 reached the VCF anyway - the old hl.export_vcf() call only had a slot for `info` and per-sample
 FORMAT fields, so every other field on the Hail row was silently dropped on export. The only things

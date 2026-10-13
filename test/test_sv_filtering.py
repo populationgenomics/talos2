@@ -1,5 +1,5 @@
 """
-Unit tests for the filtering helpers in talos2.run_hail_filtering_sv.
+Unit tests for the filtering helpers in talos.run_sv_filtering.
 
 These are the ported spec of the Hail-based tests this streaming implementation replaces.
 They cover the field rearrangement, the two blanket frequency filters, the hemizygous-call
@@ -9,14 +9,14 @@ fix, and the end-to-end labelling process.
 import pytest
 from cyvcf2 import VCF
 
-from talos2.models import GeneDetail, PanelApp
-from talos2.run_sv_filtering import (
+from talos.models import GeneDetail, PanelApp
+from talos.run_sv_filtering import (
     diploidise_genotypes,
     passes_af_filter,
     passes_callset_af_filter,
     rearrange_annotations,
 )
-from talos2.run_sv_filtering import (
+from talos.run_sv_filtering import (
     main as sv_main,
 )
 

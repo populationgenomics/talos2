@@ -22,8 +22,8 @@ import pandas as pd
 from cloudpathlib.anypath import to_anypath
 from loguru import logger
 
-from talos2.config import config_retrieve
-from talos2.models import (
+from talos.config import config_retrieve
+from talos.models import (
     GeneDetail,
     PanelApp,
     PanelShort,
@@ -33,8 +33,8 @@ from talos2.models import (
     SmallVariant,
     StructuralVariant,
 )
-from talos2.static_values import get_granular_date
-from talos2.utils import read_json_from_path
+from talos.static_values import get_granular_date
+from talos.utils import read_json_from_path
 
 JINJA_TEMPLATE_DIR = Path(__file__).absolute().parent / 'templates'
 MIN_REPORT_SIZE: int = 10

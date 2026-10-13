@@ -15,7 +15,7 @@ process HPOFlagging {
         set -euo pipefail
 
         export TALOS_CONFIG=${talos_config}
-        python -m talos2.hpo_flagging \
+        python -m talos.hpo_flagging \
              --input ${talos_result_json} \
              --panelapp ${panelapp} \
              --gen2phen ${gene_to_phenotype} \

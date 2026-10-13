@@ -29,7 +29,7 @@ from pathlib import Path
 import pysam
 from cloudpathlib.anypath import to_anypath
 
-from talos2.config import ConfigError, config_retrieve
+from talos.config import ConfigError, config_retrieve
 
 CONTIG_ORDER = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
 HEADER_LINES = [

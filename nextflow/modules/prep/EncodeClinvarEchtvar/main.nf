@@ -16,6 +16,6 @@ process EncodeClinvarEchtvar {
         """
         set -euo pipefail
 
-        echtvar encode clinvarbitration_${timestamp}.zip /talos2/echtvar/clinvar_config.json ${clinvar_vcf}
+        echtvar encode clinvarbitration_${timestamp}.zip /talos/echtvar/clinvar_config.json ${clinvar_vcf}
         """
 }

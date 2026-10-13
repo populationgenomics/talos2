@@ -1,5 +1,5 @@
 """
-Regression tests for talos2.scripts.rename_sv_af_fields.
+Regression tests for talos.scripts.rename_sv_af_fields.
 
 These guard the two field-naming rules from docs/SvAnnotation.md that are easy to get wrong:
 - Max_AF (the conservative maximum across matches), not Best_gnomAD_AF, is copied into {prefix}_sv_AF
@@ -13,7 +13,7 @@ No SVAFotate invocation is needed - the input is a hand-written VCF shaped like 
 import pytest
 from cyvcf2 import VCFReader
 
-from talos2.scripts.rename_sv_af_fields import TALOS_AF, TALOS_SVID, main
+from talos.scripts.rename_sv_af_fields import TALOS_AF, TALOS_SVID, main
 
 VCF_HEADER = """\
 ##fileformat=VCFv4.2

@@ -18,7 +18,7 @@ process CreateRoiFromGff3 {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.create_roi_from_gff3 \
+        python -m talos.scripts.create_roi_from_gff3 \
             --gff3 ${gff} \
             --unmerged_output unsorted_GRCh38.bed \
             --merged_output unsorted_merged_GRCh38.bed \

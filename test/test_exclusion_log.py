@@ -10,10 +10,10 @@ from pathlib import Path
 import pytest
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2 import config as talos_config
-from talos2 import exclusion_log
-from talos2.models import Coordinates, SmallVariant
-from talos2.moi_tests import DominantAutosomal, RecessiveAutosomalCH
+from talos import config as talos_config
+from talos import exclusion_log
+from talos.models import Coordinates, SmallVariant
+from talos.moi_tests import DominantAutosomal, RecessiveAutosomalCH
 
 TEST_COORDS = Coordinates(chrom='1', pos=1, ref='A', alt='C')
 TEST_COORDS_PARTNER = Coordinates(chrom='1', pos=2, ref='A', alt='C')

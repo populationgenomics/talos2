@@ -92,7 +92,7 @@ VCFs.
 The VCF has to be bgzipped. `ValidateMOI` indexes it before reading. Build it from per-sample STRipy JSON reports with:
 
 ```bash
-python -m talos2.scripts.stripy_json_to_vcf \
+python -m talos.scripts.stripy_json_to_vcf \
     --json sample1.json sample2.json ... \
     --output cohort_str.vcf.bgz \
     --mapping GRCh38_symbol_to_ensg.json

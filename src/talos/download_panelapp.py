@@ -34,8 +34,8 @@ from dateutil.parser import parse
 from loguru import logger
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
-from talos2.config import ConfigError, config_retrieve
-from talos2.models import (
+from talos.config import ConfigError, config_retrieve
+from talos.models import (
     DownloadedPanelApp,
     DownloadedPanelAppGene,
     DownloadedPanelAppPanel,
@@ -43,7 +43,7 @@ from talos2.models import (
     HpoTerm,
     PanelShort,
 )
-from talos2.utils import get_json_response
+from talos.utils import get_json_response
 
 ENTITY_TYPE_CONSTANT = 'entity_type'
 GENE_CONSTANT = 'gene'

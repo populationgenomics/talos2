@@ -11,10 +11,10 @@ process EncodeAlphaMissense {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.parse_alphamissense \
+        python -m talos.scripts.parse_alphamissense \
             --input ${tsv} \
             --output alphamissense.vcf.gz
 
-        echtvar encode alphamissense.zip /talos2/echtvar/am_config.json alphamissense.vcf.gz
+        echtvar encode alphamissense.zip /talos/echtvar/am_config.json alphamissense.vcf.gz
         """
 }

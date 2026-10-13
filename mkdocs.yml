@@ -1,8 +1,8 @@
 site_name: Talos
 site_description: Scalable, open-source variant prioritisation for automated reanalysis of rare disease genomic data.
-site_url: https://populationgenomics.github.io/talos2/
-repo_url: https://github.com/populationgenomics/talos2
-repo_name: populationgenomics/talos2
+site_url: https://populationgenomics.github.io/talos/
+repo_url: https://github.com/populationgenomics/talos
+repo_name: populationgenomics/talos
 edit_uri: edit/main/docs/
 
 docs_dir: docs
@@ -84,7 +84,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/populationgenomics/talos2
+      link: https://github.com/populationgenomics/talos
   generator: false
 
 copyright: Copyright &copy; Centre for Population Genomics

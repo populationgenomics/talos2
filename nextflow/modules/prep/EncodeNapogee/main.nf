@@ -11,10 +11,10 @@ process EncodeNapogee {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.parse_napogee \
+        python -m talos.scripts.parse_napogee \
             --input ${tsv} \
             --output napogee.vcf.gz
 
-        echtvar encode napogee.zip /talos2/echtvar/napogee_config.json napogee.vcf.gz
+        echtvar encode napogee.zip /talos/echtvar/napogee_config.json napogee.vcf.gz
         """
 }

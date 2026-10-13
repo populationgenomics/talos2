@@ -14,7 +14,7 @@ process RunSvFiltering {
 
         export TALOS_CONFIG=${talos_config}
 
-        python -m talos2.run_sv_filtering \
+        python -m talos.run_sv_filtering \
             --input ${sv_vcf} \
             --panelapp ${panelapp_data} \
             --pedigree ${pedigree} \

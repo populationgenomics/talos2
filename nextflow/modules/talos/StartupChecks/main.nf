@@ -15,7 +15,7 @@ process StartupChecks {
 
         export TALOS_CONFIG=${talos_config}
 
-        python -m talos2.startup_checks \\
+        python -m talos.startup_checks \\
             --vcf ${vcf} \\
             --pedigree ${pedigree}
 

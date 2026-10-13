@@ -4,7 +4,7 @@ code for lifting over models from 2.1.0 to 2.2.0
 
 from loguru import logger
 
-from talos2.static_values import get_granular_date
+from talos.static_values import get_granular_date
 
 
 def dl_panelapp(data_dict: dict) -> dict:

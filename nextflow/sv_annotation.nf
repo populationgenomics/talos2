@@ -10,7 +10,7 @@ Talos. The specific annotations are:
 
 - gene consequences, using GATK SVAnnotate against the MANE GTF. PREDICTED_LOF is the field Talos requires
 - gnomAD v4.1 population frequencies, using SVAFotate against its published popAF BED
-- a rename of SVAFotate's field names to the ones talos.run_hail_filtering_sv reads
+- a rename of SVAFotate's field names to the ones talos.run_sv_filtering reads
 
 This is deliberately separate from the ANNOTATION workflow rather than a branch inside it. That workflow's
 normalise, region-filter, split and echtvar steps are all SNV-specific and would each need bypassing, and the
@@ -25,7 +25,7 @@ include { AnnotateSvWithGatk } from './modules/annotation/AnnotateSvWithGatk/mai
 include { AnnotateSvWithSvafotate } from './modules/annotation/AnnotateSvWithSvafotate/main'
 include { CreateSequenceDictionary } from './modules/prep/CreateSequenceDictionary/main'
 include { RenameSvAfFields } from './modules/annotation/RenameSvAfFields/main'
-include { SortCpxIntervals } from './modules/annotation/SortCpxIntervals/main'
+include { PrepareSvForSvAnnotate } from './modules/annotation/PrepareSvForSvAnnotate/main'
 
 
 workflow SV_ANNOTATION {
@@ -98,10 +98,11 @@ workflow SV_ANNOTATION {
         ch_ref_dict = channel.fromPath(params.ref_dict, checkIfExists: true).first()
     }
     // SVAnnotate aborts the entire run on the first complex variant whose CPX_INTERVALS are not in
-    // coordinate order, which GATK-SV's delINVdel records never are - so sort them before GATK sees them
-    SortCpxIntervals(ch_pending_vcfs)
+    // coordinate order, which GATK-SV's delINVdel records never are - so sort them before GATK sees them.
+    // SVAnnotate also only works with symbolic alleles, so the same pass removes any non-symbolic ALT record
+    PrepareSvForSvAnnotate(ch_pending_vcfs)
     AnnotateSvWithGatk(
-        SortCpxIntervals.out,
+        PrepareSvForSvAnnotate.out,
         ch_mane_gtf,
         ch_noncoding_bed,
         ch_ref_dict,

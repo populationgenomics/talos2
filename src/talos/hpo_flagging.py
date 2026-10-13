@@ -14,10 +14,10 @@ from collections import defaultdict
 
 from semsimian import Semsimian
 
-from talos2.config import config_retrieve
-from talos2.models import PanelApp, ResultData, translate_category
-from talos2.static_values import get_granular_date
-from talos2.utils import get_symbol_to_ensg_mapping, read_json_from_path
+from talos.config import config_retrieve
+from talos.models import PanelApp, ResultData, translate_category
+from talos.static_values import get_granular_date
+from talos.utils import get_symbol_to_ensg_mapping, read_json_from_path
 
 _SEMSIM_CLIENT: Semsimian | None = None
 

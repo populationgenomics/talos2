@@ -25,8 +25,8 @@ from mendelbrot.pedigree_parser import PedigreeParser
 from numpy import isnan
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
-from talos2.config import config_retrieve
-from talos2.models import (
+from talos.config import config_retrieve
+from talos.models import (
     VARIANT_MODELS,
     Coordinates,
     DownloadedPanelApp,
@@ -38,7 +38,7 @@ from talos2.models import (
     lift_up_model_version,
     translate_category,
 )
-from talos2.static_values import get_granular_date
+from talos.static_values import get_granular_date
 
 if TYPE_CHECKING:
     import cyvcf2

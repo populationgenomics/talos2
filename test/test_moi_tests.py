@@ -5,8 +5,8 @@ tests relating to the MOI filters
 import pytest
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.models import Coordinates, SmallVariant
-from talos2.moi_tests import (
+from talos.models import Coordinates, SmallVariant
+from talos.moi_tests import (
     BaseMoi,
     ClinVarFilter,
     DominantAutosomal,

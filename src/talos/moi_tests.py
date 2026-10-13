@@ -11,11 +11,11 @@ from typing import ClassVar
 
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.config import config_retrieve
-from talos2.exclusion_log import get_exclusion_logger
-from talos2.models import VARIANT_MODELS, ReportVariant, ShortTandemRepeat, SmallVariant, StructuralVariant
-from talos2.static_values import get_granular_date
-from talos2.utils import X_CHROMOSOME, CompHetDict
+from talos.config import config_retrieve
+from talos.exclusion_log import get_exclusion_logger
+from talos.models import VARIANT_MODELS, ReportVariant, ShortTandemRepeat, SmallVariant, StructuralVariant
+from talos.static_values import get_granular_date
+from talos.utils import X_CHROMOSOME, CompHetDict
 
 HEMI_CHROMS = {'chrX', 'chrY'}
 SV_HEMI = {'male_n_hemialt'}

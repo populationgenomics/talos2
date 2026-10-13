@@ -15,9 +15,9 @@ from argparse import ArgumentParser
 from cyvcf2 import VCF, Writer
 from loguru import logger
 
-from talos2.models import PanelApp
-from talos2.utils import read_json_from_path
-from talos2.vcf_streaming import (
+from talos.models import PanelApp
+from talos.utils import read_json_from_path
+from talos.vcf_streaming import (
     consequences_to_csq_string,
     header_has_field,
     is_pathogenic,

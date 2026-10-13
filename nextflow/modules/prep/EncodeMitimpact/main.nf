@@ -11,10 +11,10 @@ process EncodeMitimpact {
         """
         set -euo pipefail
 
-        python -m talos2.scripts.parse_mitimpact \
+        python -m talos.scripts.parse_mitimpact \
             --input ${tsv} \
             --output mitimpact.vcf.gz
 
-        echtvar encode mitimpact.zip /talos2/echtvar/mitimpact_config.json mitimpact.vcf.gz
+        echtvar encode mitimpact.zip /talos/echtvar/mitimpact_config.json mitimpact.vcf.gz
         """
 }

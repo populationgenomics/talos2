@@ -2,7 +2,7 @@
 script used to create an artificial joint-called STR VCF for testing the STR path through ValidateMOI
 
 STR VCFs aren't produced by the annotation workflow - they come from STRipy JSON reports, merged by
-talos2.scripts.stripy_json_to_vcf. Rather than simulating STRipy JSON, this builds the per-sample locus dicts that
+talos.scripts.stripy_json_to_vcf. Rather than simulating STRipy JSON, this builds the per-sample locus dicts that
 stripy_json_to_vcf.load_sample returns, and hands them to the real write_multisample_vcf, so the header, GT encoding
 (1 = pathogenic-range allele, '.' = absent 2nd allele) and DISEASE_DETAILS format all match production output.
 
@@ -48,7 +48,7 @@ from pathlib import Path
 # write_multisample_vcf looks up an optional locus allow-list via config_retrieve, which needs a config path
 os.environ.setdefault('TALOS_CONFIG', str(Path(__file__).parent / 'config.toml'))
 
-from talos2.scripts.stripy_json_to_vcf import write_multisample_vcf
+from talos.scripts.stripy_json_to_vcf import write_multisample_vcf
 
 OUTPUT = Path(__file__).parent / 'joint_str.vcf'
 

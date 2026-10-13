@@ -17,7 +17,7 @@ PWD = Path(__file__).parent
 INPUT: str = str(PWD / 'input')
 environ['TALOS_CONFIG'] = join(INPUT, 'config.toml')
 
-from talos2.utils import create_small_variant, read_json_from_path  # noqa: E402
+from talos.utils import create_small_variant, read_json_from_path  # noqa: E402
 
 LABELLED = join(INPUT, '1_labelled_variant.vcf.bgz')
 Talos_OUTPUT = join(INPUT, 'output_example.json')

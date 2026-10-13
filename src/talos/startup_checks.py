@@ -14,9 +14,9 @@ from cyvcf2 import VCF
 from loguru import logger
 from mendelbrot.pedigree_parser import PedigreeParser
 
-from talos2.config import config_check, config_retrieve
-from talos2.run_small_filtering import GNOMAD_SOURCE_FIELDS
-from talos2.vcf_streaming import header_has_field, split_csq_header
+from talos.config import config_check, config_retrieve
+from talos.run_small_filtering import GNOMAD_SOURCE_FIELDS
+from talos.vcf_streaming import header_has_field, split_csq_header
 
 # collect all parsing errors as strings, print before crashing (unless everything passes...)
 LOG_ERRORS: list[str] = []
@@ -175,7 +175,7 @@ def probe_csq_arity(reader: VCF, csq_fields: list[str], vcf_path: str):
     # If any fragments contain no variants, they're likely to reach this method as the first shard, guaranteeing failure
     # This has been switched from a Error-mode failure, to a warning log message. The rest of the VCF INFO/Header checks
     # are still present for some gatekeeping, and I expect downstream failure.
-    # Given the Talos2-ownership of the annotation pipeline, the value of this startup check is no longer clear.
+    # Given Talos-ownership of the annotation pipeline, the value of this startup check is no longer clear.
     if not rows:
         logger.warning(f'VCF contains no variants: {vcf_path}. Checking was incomplete.')
     elif not rows_with_bcsq:
