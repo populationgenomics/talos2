@@ -9,9 +9,10 @@ fix, and the end-to-end labelling process.
 import pytest
 from cyvcf2 import VCF
 
-from talos.models import GeneDetail, PanelApp
+from talos.models import GeneDetail, PanelApp, RegionDetail
 from talos.run_sv_filtering import (
     diploidise_genotypes,
+    matching_regions,
     passes_af_filter,
     passes_callset_af_filter,
     rearrange_annotations,
@@ -144,6 +145,24 @@ def test_diploidise_genotypes():
     assert unchanged == [[0, 1, False], [1, 1, True]]
 
 
+def test_matching_regions():
+    """a CNV matches a region only if the type matches and the reciprocal overlap meets the required %"""
+    regions = [
+        RegionDetail(name='LOSS', chrom='1', start=1000, end=2000, variant_type='cnv_loss', required_overlap=80),
+        RegionDetail(name='BOTH', chrom='1', start=1000, end=2000, variant_type='cnv_both', required_overlap=50),
+    ]
+    # DEL 90% of region, 100% of CNV -> both
+    assert matching_regions('chr1', 1000, 1900, 'DEL', regions) == {'LOSS', 'BOTH'}
+    # DEL 100% of region, but only 50% of CNV -> BOTH only, CNV too large for LOSS's 80%
+    assert matching_regions('chr1', 1000, 3000, 'DEL', regions) == {'BOTH'}
+    # DUP 90% of region -> BOTH only, wrong type for LOSS
+    assert matching_regions('1', 1100, 2000, 'DUP', regions) == {'BOTH'}
+    # elsewhere, wrong contig, or no END -> none
+    assert not matching_regions('chr1', 5000, 6000, 'DEL', regions)
+    assert not matching_regions('chr2', 1000, 1900, 'DEL', regions)
+    assert not matching_regions('chr1', 1000, None, 'DEL', regions)
+
+
 SV_VCF_HEADER = """##fileformat=VCFv4.2
 ##contig=<ID=chr1,length=248956422>
 ##FILTER=<ID=PASS,Description="All filters passed">
@@ -176,7 +195,14 @@ class TestSvMain:
         vcf_path = tmp_path / 'input.vcf'
         vcf_path.write_text(SV_VCF_HEADER + ''.join(f'{row}\n' for row in vcf_rows))
 
-        panel = PanelApp(genes={'ENSG1': GeneDetail(symbol='GENE1', chrom='1')})
+        panel = PanelApp(
+            genes={'ENSG1': GeneDetail(symbol='GENE1', chrom='1')},
+            regions={
+                'REGION': RegionDetail(
+                    name='REGION', chrom='1', start=10000, end=15000, variant_type='cnv_loss', required_overlap=80
+                ),
+            },
+        )
         pa_path = tmp_path / 'panelapp.json'
         pa_path.write_text(panel.model_dump_json())
 
@@ -213,6 +239,32 @@ class TestSvMain:
         # raw fields are not carried through
         assert variant.INFO.get('PREDICTED_LOF') is None
         assert variant.INFO.get('SVTYPE') is None
+
+    def test_region_match_gets_its_own_row(self, tmp_path):
+        """a LoF DEL matching a region is written once per gene and once per region, each with only its category"""
+        # the other tests' CNVs are at 1000-6000, clear of the region at 10000-15000
+        region_info = COMMON_INFO.replace('END=6000', 'END=15000')
+        variants = self.run_sv(
+            tmp_path,
+            [
+                (
+                    'chr1\t10000\tsv_1\tN\t<DEL>\t50\tPASS\t'
+                    f'PREDICTED_LOF=GENE1;gnomad_v4.1_sv_AF=0.001;gnomad_v4.1_sv_SVID=gnomad-del-1;{region_info}\tGT\t0/1'
+                ),
+                # region match without any LoF consequence is retained, but a common one is not
+                f'chr1\t10000\tsv_2\tN\t<DEL>\t50\tPASS\tgnomad_v4.1_sv_AF=0.001;{region_info}\tGT\t0/1',
+                f'chr1\t10000\tsv_3\tN\t<DEL>\t50\tPASS\tgnomad_v4.1_sv_AF=0.5;{region_info}\tGT\t0/1',
+            ],
+        )
+        assert [
+            (
+                v.ID,
+                v.INFO['gene_id'],
+                v.INFO['categorybooleansv1'],
+                v.INFO['categorybooleanregulatorycnv'],
+            )
+            for v in variants
+        ] == [('sv_1', 'ENSG1', 1, 0), ('sv_1', 'REGION', 0, 1), ('sv_2', 'REGION', 0, 1)]
 
     def test_common_in_gnomad_is_dropped(self, tmp_path):
         variants = self.run_sv(

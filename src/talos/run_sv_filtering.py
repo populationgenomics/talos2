@@ -6,6 +6,10 @@ This expects data annotated by GATK's SVAnnotate tool
 CategoryBooleanSV1:
 - rare
 - predicted LoF in a listed gene
+
+CategoryBooleanRegulatoryCNV:
+- rare
+- CNV of the same type (loss/gain) as a PanelApp region, with reciprocal overlap of at least the required %
 """
 
 from argparse import ArgumentParser
@@ -15,7 +19,7 @@ from cyvcf2 import VCF, Writer
 from loguru import logger
 
 from talos.config import config_retrieve
-from talos.models import PanelApp
+from talos.models import PanelApp, RegionDetail
 from talos.utils import get_symbol_to_ensg_mapping, read_json_from_path
 from talos.vcf_streaming import (
     first_value,
@@ -26,6 +30,9 @@ from talos.vcf_streaming import (
 )
 
 GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4.1')
+
+# PanelApp region variant types, and the SVTYPEs which can match them
+REGION_SVTYPES = {'cnv_loss': {'DEL'}, 'cnv_gain': {'DUP'}, 'cnv_both': {'DEL', 'DUP'}}
 
 OUTPUT_FILTER_FIELDS = [
     {'ID': 'UNRESOLVED', 'Description': 'Variant is unresolved'},
@@ -56,6 +63,7 @@ OUTPUT_INFO_FIELDS = [
     ('gene_id', '1', 'String'),
     ('categorybooleansv1', '1', 'Integer'),
     ('categorybooleanbnd', '1', 'Integer'),
+    ('categorybooleanregulatorycnv', '1', 'Integer'),
 ]
 
 
@@ -113,6 +121,39 @@ def rearrange_annotations(
         'bnd_ensg': {gene_mapping.get(gene, gene) for gene in bnd},
         'gene_id': {gene_mapping.get(gene, gene) for gene in lof | bnd},
     }
+
+
+def matching_regions(
+    chrom: str,
+    start: int,
+    end: int | None,
+    svtype: str | None,
+    regions: list[RegionDetail],
+) -> set[str]:
+    """
+    Find PanelApp regions this CNV matches - same type, and reciprocal overlap of at least the region's required %
+
+    Args:
+        chrom (str): CNV contig, with or without a chr prefix
+        start (int): CNV start (POS)
+        end (int | None): CNV END
+        svtype (str | None): CNV SVTYPE
+        regions (list[RegionDetail]): PanelApp regions
+
+    Returns:
+        names of the matched regions
+    """
+    if end is None:
+        return set()
+    matched = set()
+    for region in regions:
+        if chrom.removeprefix('chr') != region.chrom or svtype not in REGION_SVTYPES.get(region.variant_type, set()):
+            continue
+        # the overlap must be at least the required % of both the region and the CNV, integer maths avoids rounding
+        overlap = (min(end, region.end) - max(start, region.start)) * 100
+        if overlap >= region.required_overlap * max(region.end - region.start, end - start):
+            matched.add(region.name)
+    return matched
 
 
 def passes_af_filter(info: dict[str, Any], af_threshold: float = 0.03) -> bool:
@@ -242,7 +283,8 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
 
     # pull green genes from the panelapp data - all genes in the model are green
     green_genes = set(panelapp.genes)
-    logger.info(f'Extracted {len(green_genes)} green genes')
+    regions = list(panelapp.regions.values())
+    logger.info(f'Extracted {len(green_genes)} green genes and {len(regions)} PanelApp regions')
 
     pedigree_data = parse_pedigree(pedigree)
 
@@ -264,8 +306,12 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
         if not variant_is_pass(variant):
             continue
 
-        # drop rows with no LOF consequences
-        if not (variant.INFO.get('PREDICTED_LOF') or variant.INFO.get('PREDICTED_BREAKEND_EXONIC')):
+        region_matches = matching_regions(
+            variant.CHROM, variant.POS, variant.INFO.get('END'), variant.INFO.get('SVTYPE'), regions
+        )
+
+        # drop rows with no LOF consequences or region matches
+        if not (variant.INFO.get('PREDICTED_LOF') or variant.INFO.get('PREDICTED_BREAKEND_EXONIC') or region_matches):
             continue
 
         raw_info = dict(variant.INFO)
@@ -280,9 +326,9 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
         ):
             continue
 
-        # hard filter to PanelApp green genes; everything left is `SV1`
+        # hard filter to PanelApp green genes or matched PanelApp regions
         green_gene_ids = info['gene_id'] & green_genes
-        if not green_gene_ids:
+        if not (green_gene_ids or region_matches):
             continue
 
         # replace the raw INFO fields with the curated set
@@ -297,19 +343,21 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
                 value = ','.join(sorted(value))
             variant.INFO[field_id] = value
 
-        # tried and tested - SVs predicted to cause LOF by SvAnnotate
-        variant.INFO['categorybooleansv1'] = 1 if variant.INFO['lof'] else 0
-        # second category introduced - exonic breakends
-        variant.INFO['categorybooleanbnd'] = 1 if variant.INFO['bnd'] else 0
-
         # VCF export doesn't handle hemizygous calls - recast haploid GTs as biallelic
         new_genotypes, modified = diploidise_genotypes(variant.genotypes)
         if modified:
             variant.genotypes = new_genotypes
 
-        # one output row per green gene this SV ablates
-        for gene_id in sorted(green_gene_ids):
+        # one output row per green gene this SV ablates, and one per PanelApp region it matches
+        # region rows only carry the region category, so they're not paired with gene variants as comp-hets
+        for gene_id in sorted(green_gene_ids | region_matches):
+            is_region = gene_id in region_matches
             variant.INFO['gene_id'] = gene_id
+            # tried and tested - SVs predicted to cause LOF by SvAnnotate
+            variant.INFO['categorybooleansv1'] = int(not is_region and bool(info['lof']))
+            # second category introduced - exonic breakends
+            variant.INFO['categorybooleanbnd'] = int(not is_region and bool(info['bnd']))
+            variant.INFO['categorybooleanregulatorycnv'] = int(is_region)
             writer.write_record(variant)
             kept += 1
 

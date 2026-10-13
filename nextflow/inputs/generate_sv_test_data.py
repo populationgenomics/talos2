@@ -30,6 +30,7 @@ SAMPLES = ['proband', 'father', 'mother']
 HEADER = """\
 ##fileformat=VCFv4.2
 ##contig=<ID=chr1,length=248956422>
+##contig=<ID=chr2,length=242193529>
 ##ALT=<ID=DEL,Description="Deletion">
 ##FILTER=<ID=UNRESOLVED,Description="Variant is unresolved">
 ##ALT=<ID=DUP,Description="Duplication">
@@ -77,6 +78,7 @@ class SV:
     alt: str | None = None
     extra_info: dict[str, str] = field(default_factory=dict)
     filter_list: list[str] = field(default_factory=list)
+    chrom: str = 'chr1'
 
     if not filter_list:
         filter_list = ['PASS']
@@ -108,7 +110,18 @@ class SV:
         alt = self.alt or f'<{self.svtype}>'
         filter_list = self.filter_list or ['PASS']
         filter_string = ','.join(filter_list)
-        columns = ['chr1', self.pos, self.identifier, 'N', alt, '.', filter_string, self.info(), 'GT', *self.genotypes]
+        columns = [
+            self.chrom,
+            self.pos,
+            self.identifier,
+            'N',
+            alt,
+            '.',
+            filter_string,
+            self.info(),
+            'GT',
+            *self.genotypes,
+        ]
         return '\t'.join(str(column) for column in columns)
 
 
@@ -168,13 +181,18 @@ VARIANTS = [
         extra_info={'CHR2': 'chr1', 'END2': '1533983'},
         filter_list=['UNRESOLVED'],
     ),
+    # the PanelApp regulatory region positive control. PanelApp region "IHH upstream regulatory region"
+    # (cnv_gain, 70% required overlap, monoallelic) is on panel 93, forced in nextflow/inputs/config.toml
+    SV('region_dup_IHH', 219109600, 219115111, 'DUP', 5511, ['0/1', '0/0', '0/0'], callset_af=0.001, chrom='chr2'),
+    # the region negative control: identical coordinates, genotypes and frequency, but a DEL
+    SV('region_del_IHH', 219109600, 219115111, 'DEL', 5511, ['0/1', '0/0', '0/0'], callset_af=0.001, chrom='chr2'),
 ]
 
 
 def main():
     """write the VCF, then bgzip and tabix it in place"""
     # VARIANTS is ordered by intent, not coordinate - tabix requires position order
-    rows = '\n'.join(variant.as_row() for variant in sorted(VARIANTS, key=lambda variant: variant.pos))
+    rows = '\n'.join(variant.as_row() for variant in sorted(VARIANTS, key=lambda variant: (variant.chrom, variant.pos)))
     columns = '\t'.join(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', *SAMPLES])
     OUTPUT.write_text(f'{HEADER}{columns}\n{rows}\n')
 
