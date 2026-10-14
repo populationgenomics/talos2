@@ -9,7 +9,8 @@ CategoryBooleanSV1:
 
 CategoryBooleanRegulatoryCNV:
 - rare
-- CNV of the same type (loss/gain) as a PanelApp region, with feature overlap of at least the required %
+- CNV of the same type (loss/gain) as a PanelApp region, with feature overlap of at least the required %,
+  or fully contained in the region
 """
 
 from argparse import ArgumentParser
@@ -131,7 +132,8 @@ def matching_regions(
     regions: list[RegionDetail],
 ) -> set[str]:
     """
-    Find PanelApp regions this CNV matches - same type, and region overlap of at least the region's required %
+    Find PanelApp regions this CNV matches - same type, and either region overlap of at least the region's
+    required %, or fully contained in the region
 
     Args:
         chrom (str): CNV contig, with or without a chr prefix
@@ -151,7 +153,8 @@ def matching_regions(
             continue
         # the overlap must be at least the required % of the region, integer maths avoids rounding
         overlap = (min(end, region.end) - max(start, region.start)) * 100
-        if overlap >= region.required_overlap * (region.end - region.start):
+        contained = start >= region.start and end <= region.end
+        if contained or overlap >= region.required_overlap * (region.end - region.start):
             matched.add(region.name)
     return matched
 
