@@ -97,10 +97,20 @@ def test_get_non_ref_samples(cyvcf_example_variant):
     """
 
     samples = ['male', 'father', 'mother']
-    carriers = get_non_ref_samples(variant=cyvcf_example_variant, samples=samples)
+    carriers = get_non_ref_samples(variant=cyvcf_example_variant, samples=samples, ped_samples=set(samples))
     assert carriers.het == {'male'}
     assert not carriers.hom
     assert carriers.indices == [samples.index('male')]
+
+
+def test_get_non_ref_samples_not_in_pedigree(cyvcf_example_variant):
+    """samples absent from the pedigree are dropped, even with a variant call"""
+
+    samples = ['male', 'father', 'mother']
+    carriers = get_non_ref_samples(variant=cyvcf_example_variant, samples=samples, ped_samples={'father', 'mother'})
+    assert not carriers.het
+    assert not carriers.hom
+    assert not carriers.indices
 
 
 def test_av_categories(trio_abs_variant: SmallVariant):
@@ -141,7 +151,12 @@ def test_gene_dict(two_trio_variants_vcf):
     gene = ENSG00000075043
     """
     reader = VCFReader(two_trio_variants_vcf)
-    var_dict = gather_gene_dict_from_contig(contig='chr20', variant_sources={'small': reader}, panelapp=FakePanelApp())
+    var_dict = gather_gene_dict_from_contig(
+        contig='chr20',
+        variant_sources={'small': reader},
+        panelapp=FakePanelApp(),
+        ped_samples=set(reader.samples),
+    )
     assert len(var_dict) == 1
     assert 'ENSG00000075043' in var_dict
     assert len(var_dict['ENSG00000075043']) == TWO_EXPECTED
@@ -171,7 +186,12 @@ def test_phased_dict(phased_vcf_path):
     gene = ENSG00000075043
     """
     reader = VCFReader(phased_vcf_path)
-    var_dict = gather_gene_dict_from_contig(contig='chr20', variant_sources={'small': reader}, panelapp=FakePanelApp())
+    var_dict = gather_gene_dict_from_contig(
+        contig='chr20',
+        variant_sources={'small': reader},
+        panelapp=FakePanelApp(),
+        ped_samples=set(reader.samples),
+    )
     assert len(var_dict) == ONE_EXPECTED
     assert 'ENSG00000075043' in var_dict
     assert len(var_dict['ENSG00000075043']) == TWO_EXPECTED

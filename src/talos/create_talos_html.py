@@ -27,10 +27,12 @@ from talos.models import (
     GeneDetail,
     PanelApp,
     PanelShort,
+    RegionDetail,
     ReportVariant,
     ResultData,
     ShortTandemRepeat,
     SmallVariant,
+    StrDetail,
     StructuralVariant,
 )
 from talos.static_values import get_granular_date
@@ -54,7 +56,7 @@ GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4
 # emoji source https://tools.picsart.com/text/emojis/
 CONFIDENCE_EMOJI: dict[int, str] = {3: '🟢', 2: '🟡', 1: '🔴'}
 REASON_EMOJIS = {
-    'new': '🆕',
+    'new': '➕',  # noqa: RUF001
     'clinvar': '💫',
     'pheno': '🎯',
     'green': '🚦',
@@ -638,18 +640,42 @@ class Variant:
 
         # List of (gene_id, symbol, panel_confidence_tooltip_html)
         self.genes: list[tuple[str, str, str]] = []
+        # STRs are rated separately to their gene in PanelApp, so use the STR-specific panel confidences
+        is_str = isinstance(self.var_data, ShortTandemRepeat)
         for gene_id in report_variant.gene.split(','):
-            gene_panelapp_entry = html_builder.panelapp.genes.get(gene_id, GeneDetail(symbol=gene_id))
+            gene_panelapp_entry: GeneDetail | StrDetail | RegionDetail
+            if is_str:
+                gene_panelapp_entry = html_builder.panelapp.strs.get(gene_id, StrDetail(symbol=gene_id))
+            elif gene_id in html_builder.panelapp.regions:
+                gene_panelapp_entry = html_builder.panelapp.regions[gene_id]
+                # carried in the variant data, for display in the expanded row details
+                self.var_data.info['panelapp_region'] = gene_panelapp_entry.model_dump(mode='json')
+                # observed overlap, calculated as in run_sv_filtering
+                cnv_start, cnv_end = self.var_data.coordinates.pos, int(self.var_data.info['end'])
+                region = gene_panelapp_entry
+                overlap = min(cnv_end, region.end) - max(cnv_start, region.start)
+                self.var_data.info['panelapp_region'] |= {
+                    'region_overlap': round(100 * overlap / max(region.end - region.start, 1), 1),
+                    'cnv_overlap': round(100 * overlap / max(cnv_end - cnv_start, 1), 1),
+                }
+            else:
+                gene_panelapp_entry = html_builder.panelapp.genes.get(gene_id, GeneDetail(symbol=gene_id))
             tooltip_parts = []
             for panel_id, confidence in sorted(gene_panelapp_entry.panel_confidences.items()):
                 if panel_id not in applied_panel_ids:
                     continue
                 panel_name = html_builder.panelapp.metadata.get(panel_id, PanelShort(id=panel_id)).name or str(panel_id)
                 tooltip_parts.append(f'{CONFIDENCE_EMOJI.get(confidence, "⚪")} {panel_name}')
-            self.genes.append((gene_id, gene_panelapp_entry.symbol, '<br>'.join(tooltip_parts)))
+            # region names double as PanelApp entity names, so the entity link still works
+            symbol = (
+                gene_panelapp_entry.name
+                if isinstance(gene_panelapp_entry, RegionDetail)
+                else gene_panelapp_entry.symbol
+            )
+            self.genes.append((gene_id, symbol, '<br>'.join(tooltip_parts)))
 
-            # is this a new gene?
-            new_panels = gene_panelapp_entry.new
+            # is this a new gene? STR and region green dates aren't currently parsed from PanelApp activity
+            new_panels = gene_panelapp_entry.new if isinstance(gene_panelapp_entry, GeneDetail) else set()
 
             if html_builder.base_panel in new_panels:
                 self.new_in_base_panel = True
