@@ -96,6 +96,7 @@ SCHEMA_OPTIONAL = {
     },
     'RunSvFiltering': {
         'gnomad_population': str,
+        'regulatory_region_percentage': int,
     },
     'ValidateMOI': {
         'ignore_categories': list,

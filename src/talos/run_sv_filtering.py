@@ -133,7 +133,7 @@ def matching_regions(
 ) -> set[str]:
     """
     Find PanelApp regions this CNV matches - same type, and either region overlap of at least the region's
-    required %, or fully contained in the region
+    required %, or fully contained in the region (subject to a minimum percentage of region overlap)
 
     Args:
         chrom (str): CNV contig, with or without a chr prefix
@@ -147,13 +147,19 @@ def matching_regions(
     """
     if end is None:
         return set()
+    # a CNV fully enclosed by a region must still cover at least this % of the region to be considered a match
+    min_region_percentage = config_retrieve(['RunSvFiltering', 'regulatory_region_percentage'], 10)
     matched = set()
     for region in regions:
         if chrom.removeprefix('chr') != region.chrom or svtype not in REGION_SVTYPES.get(region.variant_type, set()):
             continue
         # the overlap must be at least the required % of the region, integer maths avoids rounding
         overlap = (min(end, region.end) - max(start, region.start)) * 100
-        contained = start >= region.start and end <= region.end
+        contained = (
+            start >= region.start
+            and end <= region.end
+            and (end - start) * 100 >= min_region_percentage * (region.end - region.start)
+        )
         if contained or overlap >= region.required_overlap * (region.end - region.start):
             matched.add(region.name)
     return matched
