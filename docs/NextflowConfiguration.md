@@ -53,10 +53,12 @@ The joint-called SV VCF is supplied per cohort, as an `sv` column in the input T
 `mito` column. A bgzipped VCF with a matching `.tbi` is expected. Cohorts with no SV data simply leave the
 column empty.
 
-The input VCF must already carry `AC`, `AF`, `AN`, `N_HET`, `N_HOMALT` and array-typed `MALE_AF`/`FEMALE_AF`
-(or `AF_MALE`/`AF_FEMALE`). None of these are written by the annotation chain, and `RunSmallFilteringSv` reads
-them unconditionally — so a VCF missing them fails at the very end of the run, after both expensive annotation
-steps have completed. A full GATK-SV callset carries all of them; a bare gCNV or caller-native VCF may not.
+A full GATK-SV callset carries `AC`, `AF`, `AN`, `N_HET`, `N_HOMALT`, array-typed `MALE_AF`/`FEMALE_AF` (or
+`AF_MALE`/`AF_FEMALE`) and `SVLEN`; a bare gCNV or caller-native VCF may not. All are optional. The annotation
+chain doesn't write the frequency fields, so when they are absent `RunSvFiltering` logs a warning and skips the
+filter that depends on them. Without `MALE_AF`/`FEMALE_AF` the per-sex callset AF filter falls back to overall `AF`
+(skipped if that is absent too), and the callset AC/AF filter in `ValidateMOI` is skipped without `AC`/`AF`. Expect more, commoner SVs in the report. A missing `SVLEN` is
+backfilled as `END - POS` before SVAnnotate, where `END` is present and greater than `POS`.
 
 ### Trying it out
 

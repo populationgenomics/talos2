@@ -19,6 +19,7 @@ VCF_HEADER = """\
 ##ALT=<ID=DEL,Description="Deletion">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV type">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End">
+##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length">
 ##INFO=<ID=CPX_INTERVALS,Number=.,Type=String,Description="Complex SV intervals">
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO
 """
@@ -95,3 +96,29 @@ def test_cpx_intervals_sorted_on_kept_records(tmp_path):
     assert variant.INFO.get('CPX_INTERVALS') == (
         'DEL_chr1:1416597-16725244,INV_chr1:16725244-64416883,DEL_chr1:64416883-234776440'
     )
+
+
+def test_svlen_backfilled_where_derivable(tmp_path):
+    """a missing SVLEN becomes END - POS; an existing one is kept; one with END <= POS is left absent"""
+    variants, _messages = _run(
+        tmp_path,
+        [
+            'chr1\t1000\tno_len\tN\t<DEL>\t.\tPASS\tSVTYPE=DEL;END=5000',
+            'chr1\t2000\thas_len\tN\t<DEL>\t.\tPASS\tSVTYPE=DEL;END=5000;SVLEN=7',
+            'chr1\t3000\tbnd\tN\tN[chr2:123[\t.\tPASS\tSVTYPE=BND;END=3000',
+        ],
+    )
+    assert [variant.INFO.get('SVLEN') for variant in variants] == [4000, 7, None]
+
+
+def test_svlen_header_added_when_absent(tmp_path):
+    """a callset with no SVLEN header gets one, so the backfilled value is declared"""
+    vcf_in = tmp_path / 'in.vcf'
+    vcf_in.write_text(
+        VCF_HEADER.replace('##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length">\n', '')
+        + 'chr1\t1000\tno_len\tN\t<DEL>\t.\tPASS\tSVTYPE=DEL;END=5000\n'
+    )
+    vcf_out = str(tmp_path / 'out.vcf')
+    main(vcf_in=str(vcf_in), vcf_out=vcf_out)
+    (variant,) = list(VCFReader(vcf_out))
+    assert variant.INFO.get('SVLEN') == 4000
