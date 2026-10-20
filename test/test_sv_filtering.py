@@ -146,7 +146,9 @@ def test_diploidise_genotypes():
 
 
 def test_matching_regions():
-    """a CNV matches a region if the type matches, and it overlaps the required % of the region or is fully inside it"""
+    """a CNV matches a region if the type matches, and it overlaps the required % of the region, or is inside it and
+    covers at least regulatory_region_percentage of it
+    """
     regions = [
         RegionDetail(name='LOSS', chrom='1', start=1000, end=2000, variant_type='cnv_loss', required_overlap=80),
         RegionDetail(name='BOTH', chrom='1', start=1000, end=2000, variant_type='cnv_both', required_overlap=50),
@@ -157,8 +159,10 @@ def test_matching_regions():
     assert matching_regions('chr1', 1000, 3000, 'DEL', regions) == {'LOSS', 'BOTH'}
     # DEL 70% of region, hanging off the start -> BOTH only, too small for LOSS's 80%
     assert matching_regions('chr1', 300, 1700, 'DEL', regions) == {'BOTH'}
-    # DEL 10% of region, fully inside it -> both, containment ignores the required %
-    assert matching_regions('chr1', 1400, 1500, 'DEL', regions) == {'LOSS', 'BOTH'}
+    # DEL 20% of region, fully inside it -> both, containment only needs regulatory_region_percentage (15)
+    assert matching_regions('chr1', 1400, 1600, 'DEL', regions) == {'LOSS', 'BOTH'}
+    # DEL 10% of region, fully inside it -> none, below regulatory_region_percentage
+    assert not matching_regions('chr1', 1400, 1500, 'DEL', regions)
     # DUP 90% of region -> BOTH only, wrong type for LOSS
     assert matching_regions('1', 1100, 2000, 'DUP', regions) == {'BOTH'}
     # elsewhere, wrong contig, or no END -> none
