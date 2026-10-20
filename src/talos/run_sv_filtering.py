@@ -35,6 +35,9 @@ GNOMAD_POP = config_retrieve(['RunSvFiltering', 'gnomad_population'], 'gnomad_v4
 # PanelApp region variant types, and the SVTYPEs which can match them
 REGION_SVTYPES = {'cnv_loss': {'DEL'}, 'cnv_gain': {'DUP'}, 'cnv_both': {'DEL', 'DUP'}}
 
+# curated INFO keys the callset AF filter reads, preferred first
+SEX_AF_FIELDS = ('male_af', 'female_af')
+
 OUTPUT_FILTER_FIELDS = [
     {'ID': 'UNRESOLVED', 'Description': 'Variant is unresolved'},
 ]
@@ -97,19 +100,20 @@ def rearrange_annotations(
     else:
         male_af, female_af = info.get('MALE_AF'), info.get('FEMALE_AF')
 
+    # AC/AF/AN, N_HET/N_HOMALT and SVLEN aren't written by every caller; absent values are omitted from the output
     return {
-        'AC': info['AC'],
-        'AF': info['AF'],
-        'AN': info['AN'],
+        'AC': info.get('AC'),
+        'AF': info.get('AF'),
+        'AN': info.get('AN'),
         # accept, but don't force, this GATK-SV field
         'algorithms': info.get('ALGORITHMS', 'gCNV'),
         'gnomad_sv_ID': info.get(f'{GNOMAD_POP}_sv_SVID'),
         'gnomad_sv_AF': info.get(f'{GNOMAD_POP}_sv_AF', 0.0),
         'lof': lof,
         'bnd': bnd,
-        'n_het': info['N_HET'],
-        'n_homalt': info['N_HOMALT'],
-        'svlen': info['SVLEN'],
+        'n_het': info.get('N_HET'),
+        'n_homalt': info.get('N_HOMALT'),
+        'svlen': info.get('SVLEN'),
         'svtype': info['SVTYPE'],
         'status': info.get('STATUS'),
         'end': info.get('END'),
@@ -170,15 +174,18 @@ def passes_af_filter(info: dict[str, Any], af_threshold: float = 0.03) -> bool:
     return (first_value(info['gnomad_sv_AF']) or 0) < af_threshold
 
 
-def passes_callset_af_filter(info: dict[str, Any], ac_threshold: float = 0.03) -> bool:
+def passes_callset_af_filter(
+    info: dict[str, Any],
+    ac_threshold: float = 0.03,
+    af_fields: tuple[str, ...] = SEX_AF_FIELDS,
+) -> bool:
     """
-    Both per-sex callset frequencies at or below threshold.
+    Every callset frequency in af_fields at or below threshold - per-sex by default, overall AF as a fallback,
+    or none at all (always passes) when the callset has neither.
     We don't need to worry about minimum cohort size due to the minimum group size of GATK-SV.
     A missing frequency fails, matching the Hail filter this replaces.
     """
-    male_af = first_value(info['male_af'])
-    female_af = first_value(info['female_af'])
-    return male_af is not None and female_af is not None and male_af <= ac_threshold and female_af <= ac_threshold
+    return all((af := first_value(info[field])) is not None and af <= ac_threshold for field in af_fields)
 
 
 def diploidise_genotypes(genotypes: list[list]) -> tuple[list[list], bool]:
@@ -208,14 +215,30 @@ def diploidise_genotypes(genotypes: list[list]) -> tuple[list[list], bool]:
     return result, modified
 
 
-def prepare_output_header(reader: VCF) -> bool:
+def prepare_output_header(reader: VCF) -> tuple[bool, tuple[str, ...]]:
     """
     Add the curated INFO field definitions to the reader's header, ahead of Writer creation.
+    Callset-frequency fields are optional; each one absent is warned about, as its filter is skipped.
 
     Returns:
         whether this callset spells the per-sex frequencies AF_MALE/AF_FEMALE
-        (a header-level property) instead of MALE_AF/FEMALE_AF
+        (a header-level property) instead of MALE_AF/FEMALE_AF, and the curated fields the callset AF filter
+        should read: per-sex if present, else overall AF, else none
     """
+    # checked before the output fields are added, as those include AC/AF/AN
+    if missing := [field for field in ('AC', 'AF', 'AN', 'N_HET', 'N_HOMALT') if not header_has_field(reader, field)]:
+        logger.warning(
+            f'SV VCF has no {", ".join(missing)} - omitted from the output; '
+            'if AC/AF are among them, the callset AC/AF filter in ValidateMOI is skipped',
+        )
+    af_fields: tuple[str, ...] = SEX_AF_FIELDS
+    if not (header_has_field(reader, 'MALE_AF') or header_has_field(reader, 'AF_MALE')):
+        af_fields = ('AF',) if header_has_field(reader, 'AF') else ()
+        logger.warning(
+            'SV VCF has no MALE_AF/FEMALE_AF (or AF_MALE/AF_FEMALE) - callset AF filter '
+            + ('falls back to overall AF' if af_fields else 'is skipped'),
+        )
+
     for filter_dict in OUTPUT_FILTER_FIELDS:
         reader.add_filter_to_header(filter_dict)
     for field_id, number, field_type in OUTPUT_INFO_FIELDS:
@@ -223,7 +246,7 @@ def prepare_output_header(reader: VCF) -> bool:
             reader.add_info_to_header(
                 {'ID': field_id, 'Number': number, 'Type': field_type, 'Description': 'Talos SV annotation'},
             )
-    return header_has_field(reader, 'AF_MALE')
+    return header_has_field(reader, 'AF_MALE'), af_fields
 
 
 def cli_main():
@@ -303,7 +326,7 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
     if not subset_reader_to_pedigree(reader, pedigree_data):
         raise ValueError('No samples shared between pedigree and VCF')
 
-    uses_af_male_spelling = prepare_output_header(reader)
+    uses_af_male_spelling, callset_af_fields = prepare_output_header(reader)
 
     writer = Writer(vcf_out, reader, mode='wz')
 
@@ -330,7 +353,7 @@ def main(vcf_path: str, panelapp_path: str, pedigree: str, vcf_out: str):
 
         # apply blanket filters
         if not (
-            passes_callset_af_filter(info, ac_threshold=ac_threshold)
+            passes_callset_af_filter(info, ac_threshold=ac_threshold, af_fields=callset_af_fields)
             and passes_af_filter(info, af_threshold=ac_threshold)
         ):
             continue

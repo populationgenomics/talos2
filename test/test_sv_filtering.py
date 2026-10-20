@@ -8,6 +8,7 @@ fix, and the end-to-end labelling process.
 
 import pytest
 from cyvcf2 import VCF
+from loguru import logger
 
 from talos.models import GeneDetail, PanelApp, RegionDetail
 from talos.run_sv_filtering import (
@@ -120,6 +121,10 @@ def test_callset_af_filter_needs_both_sexes_below_threshold():
     assert not passes_callset_af_filter({'male_af': (0.01,), 'female_af': (0.9,)}, ac_threshold=0.03)
     # a missing frequency fails, matching the Hail filter this replaces
     assert not passes_callset_af_filter({'male_af': None, 'female_af': (0.02,)}, ac_threshold=0.03)
+    # overall AF fallback, and no callset frequency at all
+    assert passes_callset_af_filter({'AF': 0.01}, ac_threshold=0.03, af_fields=('AF',))
+    assert not passes_callset_af_filter({'AF': 0.9}, ac_threshold=0.03, af_fields=('AF',))
+    assert passes_callset_af_filter({}, ac_threshold=0.03, af_fields=())
 
 
 def test_diploidise_genotypes():
@@ -199,9 +204,9 @@ COMMON_INFO = 'SVTYPE=DEL;SVLEN=5000;END=6000;AC=1;AF=0.01;AN=100;N_HET=1;N_HOMA
 class TestSvMain:
     """End-to-end tests for the streaming SV labelling process."""
 
-    def run_sv(self, tmp_path, vcf_rows):
+    def run_sv(self, tmp_path, vcf_rows, header=SV_VCF_HEADER):
         vcf_path = tmp_path / 'input.vcf'
-        vcf_path.write_text(SV_VCF_HEADER + ''.join(f'{row}\n' for row in vcf_rows))
+        vcf_path.write_text(header + ''.join(f'{row}\n' for row in vcf_rows))
 
         panel = PanelApp(
             genes={'ENSG1': GeneDetail(symbol='GENE1', chrom='1')},
@@ -247,6 +252,46 @@ class TestSvMain:
         # raw fields are not carried through
         assert variant.INFO.get('PREDICTED_LOF') is None
         assert variant.INFO.get('SVTYPE') is None
+
+    def test_frequency_fields_and_svlen_optional(self, tmp_path):
+        """a caller with no AC/AF/AN/N_HET/N_HOMALT/per-sex AF/SVLEN is still labelled, with a warning"""
+        optional = tuple(
+            f'##INFO=<ID={field},' for field in ('SVLEN', 'AC', 'AF', 'AN', 'N_HET', 'N_HOMALT', 'MALE_AF', 'FEMALE_AF')
+        )
+        header = ''.join(line for line in SV_VCF_HEADER.splitlines(keepends=True) if not line.startswith(optional))
+        messages: list[str] = []
+        handler = logger.add(messages.append, format='{message}')
+        try:
+            variants = self.run_sv(
+                tmp_path,
+                ['chr1\t1000\tsv_1\tN\t<DEL>\t50\tPASS\tPREDICTED_LOF=GENE1;SVTYPE=DEL;END=6000\tGT\t0/1'],
+                header=header,
+            )
+        finally:
+            logger.remove(handler)
+
+        (variant,) = variants
+        assert variant.INFO['categorybooleansv1'] == 1
+        assert variant.INFO.get('svlen') is None
+        assert variant.INFO.get('AC') is None
+        assert any('SV VCF has no AC, AF, AN, N_HET, N_HOMALT' in message for message in messages)
+        assert any('callset AF filter is skipped' in message for message in messages)
+
+    @pytest.mark.parametrize(('af', 'kept'), [(0.01, 1), (0.9, 0)])
+    def test_overall_af_fallback(self, tmp_path, af, kept):
+        """without per-sex frequencies, the callset AF filter falls back to overall AF"""
+        header = ''.join(
+            line
+            for line in SV_VCF_HEADER.splitlines(keepends=True)
+            if not line.startswith(('##INFO=<ID=MALE_AF,', '##INFO=<ID=FEMALE_AF,'))
+        )
+        info = COMMON_INFO.replace(';MALE_AF=0.01;FEMALE_AF=0.02', '').replace('AF=0.01', f'AF={af}')
+        variants = self.run_sv(
+            tmp_path,
+            [f'chr1\t1000\tsv_1\tN\t<DEL>\t50\tPASS\tPREDICTED_LOF=GENE1;gnomad_v4.1_sv_AF=0.001;{info}\tGT\t0/1'],
+            header=header,
+        )
+        assert len(variants) == kept
 
     def test_region_match_gets_its_own_row(self, tmp_path):
         """a LoF DEL matching a region is written once per gene and once per region, each with only its category"""

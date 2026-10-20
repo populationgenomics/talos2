@@ -13,9 +13,9 @@ docs/SvAnnotation.md. Coordinates are taken from the real reference data:
   BED START is 0-based and VCF POS is 1-based, so a query matching a BED record exactly is POS = START + 1
   and END = END
 
-Nothing in the annotation chain writes AC, AF, AN, N_HET, N_HOMALT, MALE_AF or FEMALE_AF - they have to be
-present in the joint-called input already, or run_sv_filtering raises at rearrange_annotations(). They
-are written here for that reason, with MALE_AF/FEMALE_AF array-typed.
+Nothing in the annotation chain writes AC, AF, AN, N_HET, N_HOMALT, MALE_AF or FEMALE_AF. They are optional,
+but run_sv_filtering skips the frequency filters that need them when absent, so they are written here to exercise
+those filters, with MALE_AF/FEMALE_AF array-typed.
 """
 
 import subprocess

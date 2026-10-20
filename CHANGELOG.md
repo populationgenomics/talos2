@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * CNVs fully contained in a region must still cover at least `RunSvFiltering.regulatory_region_percentage` (default 10) % of the region to match
   * `generate_sv_test_data.py` adds a positive (DUP) and negative (DEL) control for the IHH upstream regulatory region, on panel 93, now forced in `nextflow/inputs/config.toml`
 
+## Changed
+
+  * SV input no longer needs every GATK-SV field. `AC`, `AF`, `AN`, `N_HET`, `N_HOMALT`, `MALE_AF`/`FEMALE_AF` and `SVLEN` are optional; a missing frequency field logs a warning and its filter is skipped, except the per-sex AF filter, which falls back to overall `AF`
+  * `prepare_sv_for_svannotate.py` backfills a missing `SVLEN` as `END - POS` where `END > POS`
+
 [0.5.0] - 2026-09
 
 ## Added

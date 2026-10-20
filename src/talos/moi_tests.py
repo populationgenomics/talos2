@@ -139,7 +139,8 @@ class FrequencyFilter:
         if max_af is None and max_ac is None:
             return False
 
-        ac, af = variant.info['ac'], variant.info['af']
+        # SV callsets may lack AC/AF; treated as 0, which falls under ac_min and skips this filter
+        ac, af = variant.info.get('ac', 0), variant.info.get('af', 0)
         if ac <= self.ac_min:
             return False
 

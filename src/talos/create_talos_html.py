@@ -585,7 +585,8 @@ class Variant:
 
             return f'{self.ref}->{self.alt}'
         if isinstance(self.var_data, StructuralVariant):
-            return f'{self.var_data.info["svtype"]} {self.var_data.info["svlen"]}bp'
+            info = self.var_data.info
+            return f'{info["svtype"]} {info["svlen"]}bp' if 'svlen' in info else info['svtype']
 
         if isinstance(self.var_data, ShortTandemRepeat):
             locus = self.var_data.locus or self.var_data.info.get('locus')

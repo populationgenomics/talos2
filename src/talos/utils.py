@@ -668,7 +668,9 @@ def create_structural_variant(var: 'cyvcf2.Variant', samples: list[str], ped_sam
     if all(attribute in info for attribute in ('chr2', 'end2')):
         info['svlen'] = f'{info["chr2"]}:{info["end2"]}'
 
-    coordinates = Coordinates(chrom=var.CHROM.replace('chr', ''), pos=var.POS, ref=var.ALT[0], alt=str(info['svlen']))
+    coordinates = Coordinates(
+        chrom=var.CHROM.replace('chr', ''), pos=var.POS, ref=var.ALT[0], alt=str(info.get('svlen', '.'))
+    )
 
     carriers = get_non_ref_samples(variant=var, samples=samples, ped_samples=ped_samples)
 

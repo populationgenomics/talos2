@@ -42,6 +42,10 @@ Records with a non-symbolic ALT are removed because SVAnnotate only works with s
 annotation. "Symbolic" follows htsjdk's `Allele.wouldBeSymbolicAllele`, the check GATK applies, so nothing
 GATK would accept is dropped. A record is removed if any of its ALTs fails that test, or if it has no ALT at
 all. Each removed record is logged individually, so the losses can be checked against the callset.
+
+Not every caller writes `SVLEN`. Where it is absent it is backfilled as `END - POS`, the GATK-SV convention for
+symbolic records (sequence-resolved records, where `len(ALT) - len(REF)` would apply, are removed above). Records
+where that can't be derived - no `END`, or `END <= POS` as for insertions and breakends - are kept without one.
 """
 
 from argparse import ArgumentParser
@@ -49,8 +53,11 @@ from argparse import ArgumentParser
 from cyvcf2 import VCF, Writer
 from loguru import logger
 
+from talos.vcf_streaming import header_has_field
+
 # a CPX_INTERVALS entry is `SVTYPE_contig:start-end`, e.g. `DEL_chr1:1416597-16725244`
 CPX_INTERVALS = 'CPX_INTERVALS'
+SVLEN = 'SVLEN'
 
 
 def is_symbolic(allele: str) -> bool:
@@ -157,7 +164,7 @@ def cli_main():
 def main(vcf_in: str, vcf_out: str):
     """
     Remove records with a non-symbolic ALT, coordinate-sort CPX_INTERVALS on every remaining record that carries
-    it, and write the VCF back out.
+    it, backfill any missing SVLEN, and write the VCF back out.
 
     Args:
         vcf_in (str): path to the SV VCF
@@ -165,6 +172,10 @@ def main(vcf_in: str, vcf_out: str):
     """
 
     vcf = VCF(vcf_in)
+    if not header_has_field(vcf, SVLEN):
+        vcf.add_info_to_header(
+            {'ID': SVLEN, 'Number': '1', 'Type': 'Integer', 'Description': 'SV length, END - POS, added by Talos'},
+        )
     writer = Writer(vcf_out, vcf)
 
     variants = 0
@@ -172,6 +183,7 @@ def main(vcf_in: str, vcf_out: str):
     complex_variants = 0
     reordered = 0
     unparseable = 0
+    svlen_added = 0
 
     for variant in vcf:
         variants += 1
@@ -198,6 +210,10 @@ def main(vcf_in: str, vcf_out: str):
                 unparseable += 1
                 logger.warning(f'{variant.ID}: leaving {CPX_INTERVALS} unsorted - {e}')
 
+        if variant.INFO.get(SVLEN) is None and (end := variant.INFO.get('END')) and end > variant.POS:
+            variant.INFO[SVLEN] = end - variant.POS
+            svlen_added += 1
+
         writer.write_record(variant)
 
     writer.close()
@@ -206,6 +222,7 @@ def main(vcf_in: str, vcf_out: str):
     logger.info(f'Removed {non_symbolic} of {variants} records with a non-symbolic ALT')
     logger.info(f'Checked {complex_variants} complex variants across {variants - non_symbolic} records')
     logger.info(f'Coordinate-sorted {CPX_INTERVALS} on {reordered} of them')
+    logger.info(f'Populated {SVLEN} as END - POS on {svlen_added} records')
 
     if unparseable:
         logger.warning(f'{unparseable} records had an unparseable {CPX_INTERVALS} and were left untouched')
