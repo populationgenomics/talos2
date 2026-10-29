@@ -64,7 +64,7 @@ workflow TALOS {
     // what they are for - the cost is that which shard gets checked can vary between runs, so this
     // (cheap) process is not reliably -resume cacheable
     ch_first_shards = ch_shards
-        .unique { it[0] }
+        .unique { it -> it[0] }
         .join(ch_meta)
         .map { cohort, vcf, pedigree, config, _history, _ext, _seqr, _mito, _str ->
             tuple(cohort, vcf, pedigree, config)
@@ -138,7 +138,7 @@ workflow TALOS {
         .map { cohort, sv_vcf, _sv_idx -> tuple(cohort, sv_vcf) }
         .mix(ch_sv_placeholder)
         .groupTuple(by: 0)
-        .map { cohort, sv_vcfs -> tuple(cohort, sv_vcfs.find { it } ?: []) }
+        .map { cohort, sv_vcfs -> tuple(cohort, sv_vcfs.find { it -> it } ?: []) }
 
     // surprise! It's Mito data!
     ch_mito_joined = ch_meta
@@ -149,8 +149,8 @@ workflow TALOS {
     }
 
     // absent mito data is [] (falsy), a real VCF is a truthy Path
-    ch_mito_branched = ch_mito_joined.branch {
-        real:  it[1]
+    ch_mito_branched = ch_mito_joined.branch { row ->
+        real:  row[1]
         empty: true
     }
 

@@ -32,7 +32,7 @@ include { WriteShardManifest } from './modules/annotation/WriteShardManifest/mai
 def shardsFromManifest(cohort, dir, manifest, source) {
     def parsed = new groovy.json.JsonSlurper().parseText(manifest.text)
     def listed = parsed.shards as Set
-    def stale = dir.listFiles().findAll { it.name.endsWith('_csq.vcf.bgz') && !listed.contains(it.name) }
+    def stale = dir.listFiles().findAll { it -> it.name.endsWith('_csq.vcf.bgz') && !listed.contains(it.name) }
     if (stale) {
         println "WARNING: ${cohort}: ignoring ${stale.size()} shard(s) in ${dir} not listed in the manifest: ${stale*.name.join(', ')}"
     }
@@ -87,10 +87,10 @@ workflow ANNOTATION {
         shardsFromManifest(cohort, dir, manifest, row[1])
     }
 
-    ch_inputs_branched = ch_reuse_branched.pending.branch {
-        shards: it[2] == 'shards'
-        vcf_dir: it[2] == 'ss_vcf_dir'
-        single_vcf: it[2] == 'vcf'
+    ch_inputs_branched = ch_reuse_branched.pending.branch { row ->
+        shards: row[2] == 'shards'
+        vcf_dir: row[2] == 'ss_vcf_dir'
+        single_vcf: row[2] == 'vcf'
     }
 
     // Process shards
@@ -102,7 +102,7 @@ workflow ANNOTATION {
     // Process single-sample components
     ch_vcf_dir_inputs = ch_inputs_branched.vcf_dir.map { cohort, path, _type ->
         def vcfs = files("${path}/*.${params.input_vcf_extension}")
-        def tbis = vcfs.collect { file("${it}.tbi") }
+        def tbis = vcfs.collect { vcf -> file("${vcf}.tbi") }
         tuple(cohort, vcfs, tbis)
     }
 
@@ -118,8 +118,8 @@ workflow ANNOTATION {
     }
     // sibling resolution stays on the Path object. Interpolating a cloud path into a string
     // drops the gs:// scheme, which sent every indexed input down the re-index branch as the index wasn't local
-    ch_singles_branched = ch_single_vcfs.branch {
-        indexed: it[1].resolveSibling("${it[1].name}.tbi").exists()
+    ch_singles_branched = ch_single_vcfs.branch { row ->
+        indexed: row[1].resolveSibling("${row[1].name}.tbi").exists()
         unindexed: true
     }
 
