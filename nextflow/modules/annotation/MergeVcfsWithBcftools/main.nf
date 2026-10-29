@@ -9,7 +9,7 @@ process MergeVcfsWithBcftools {
         tuple val(cohort), path("${cohort}_merged.vcf.bgz"), path("${cohort}_merged.vcf.bgz.tbi")
 
     script:
-        def input = (vcfs.collect().size() > 1) ? vcfs.sort{ it.name } : vcfs
+        def input = (vcfs.collect().size() > 1) ? vcfs.sort{ it -> it.name } : vcfs
         """
         set -euo pipefail
 
