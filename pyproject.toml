@@ -63,6 +63,9 @@ stripy = [
 sv = [
     'svafotate-cpg@git+https://github.com/MattWellie/svafotate#egg=main'
 ]
+cpg = [
+    'metamist>=7.14.3',
+]
 
 [project.urls]
 Repository = "https://github.com/populationgenomics/talos"
