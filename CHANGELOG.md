@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * Optional `sv_annotated` input TSV column: an already annotated SV VCF (e.g. GATK-SV output) which bypasses SV annotation and goes straight to SV filtering. Setting both `sv` and `sv_annotated` on one row is an error
   * Small-variant and `sv` VCFs are subset to the pedigree's samples during annotation, dropping variants no pedigree sample carries, so a dataset-wide callset is annotated and stored at cohort size. VCFs already matching the pedigree are unchanged. Pedigree samples missing from a VCF are a warning, no shared samples an error. See `docs/Pedigree.md`
   * CPG only: `talos.cpg_internal.input_tsv_from_metamist` builds input TSV rows for Metamist cohorts, generating each cohort's pedigree, external ID map, seqr map and merged config. It needs the new `cpg` extra (`metamist`)
+  * CPG only: `cpg_main.nf`, a second entrypoint over `TALOS_PIPELINE`. It takes Metamist cohort IDs (`--cohort_ids`, `--access_level`, `--sequencing_type`, `--talos_config`) instead of an input TSV, builds the cohort rows with `InputTsvFromMetamist`, and publishes each cohort to `gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/{annotated,analysis_YYYYMMDD}/`. See `docs/CpgDeployment.md`
 
 ## Changed
 
@@ -32,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * `preparation.nf` publishes each newly generated resource directly to `params.processed_annotations`, and no longer needs an output directory
   * The annotation → SV annotation → analysis wiring moved out of `main.nf` into a shared `TALOS_PIPELINE` workflow (`nextflow/talos_pipeline.nf`), which takes one row per cohort with its output directories. `main.nf` now only validates params, builds those rows from the input TSV, and writes the next-cycle TSV. Process names gain a `TALOS_PIPELINE:` prefix, so `-resume` won't reuse tasks cached by earlier runs
   * SV annotation is decided per input TSV row instead of by whether the TSV has an `sv` column. The SV reference data (`svafotate_bed`, `mane_gtf`, `svannotate_noncoding_bed`) is now required for every run
+
+## Fixed
+
+  * The default `errorStrategy` in `nextflow.config` read `process.maxRetries`, which is undefined when the closure runs. Every task failure threw instead of retrying. It now reads `task.maxRetries`, so failed tasks are retried up to 3 times with backoff
 
 ## Removed
 
