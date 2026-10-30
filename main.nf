@@ -9,7 +9,7 @@ nextflow.enable.dsl=2
     Runs the shared TALOS_PIPELINE (nextflow/talos_pipeline.nf) over the cohorts in an input TSV:
 
     1. ANNOTATION: Annotates VCF file(s) with the prepared data.
-    2. SV_ANNOTATION: Annotates a joint-called SV VCF, if the input TSV carries an `sv` column.
+    2. SV_ANNOTATION: Annotates a joint-called SV VCF, for each cohort with an `sv` VCF.
     3. TALOS: Runs the core Talos analysis/filtering/reporting.
 
     Annotation (small-variant and SV alike) is idempotent: cohorts whose annotation products are
@@ -93,11 +93,7 @@ workflow {
 		.splitCsv(header: true, sep: '\t')
 		.map { row -> row + [annotated_dir: annotatedDir(row.cohort), analysis_dir: analysisDir(row.cohort)] }
 
-	// the SV path is entirely optional, and only wired up if the input TSV declares an `sv` column.
-	// this is checked eagerly rather than per-row so that a cohort with no SV data never requires SV reference files
-	def sv_requested = file(params.input_tsv).withReader { handle -> handle.readLine() }.tokenize('\t').contains('sv')
-
-	TALOS_PIPELINE(ch_cohorts, sv_requested)
+	TALOS_PIPELINE(ch_cohorts)
 
 	// a ready-to-use input TSV for the next reanalysis cycle - identical to this run's input, with
 	// `history` repointed at the results JSON published for that cohort by this run, written to the

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * `main.nf` takes its output root from the required `--outdir` param. `-output-dir` / `outputDir` is no longer read
   * `preparation.nf` publishes each newly generated resource directly to `params.processed_annotations`, and no longer needs an output directory
   * The annotation → SV annotation → analysis wiring moved out of `main.nf` into a shared `TALOS_PIPELINE` workflow (`nextflow/talos_pipeline.nf`), which takes one row per cohort with its output directories. `main.nf` now only validates params, builds those rows from the input TSV, and writes the next-cycle TSV. Process names gain a `TALOS_PIPELINE:` prefix, so `-resume` won't reuse tasks cached by earlier runs
+  * SV annotation is decided per input TSV row instead of by whether the TSV has an `sv` column. The SV reference data (`svafotate_bed`, `mane_gtf`, `svannotate_noncoding_bed`) is now required for every run
 
 ## Removed
 

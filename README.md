@@ -290,7 +290,7 @@ And missing/supplied content can differ per row; this config would provide all m
 | CohB   | /path/to/b.vcf.bgz | vcf  | /path/to/pedigree.ped | /path/to/config.toml |                 |         |          |                      |    |     |
 
 > **Note**
-> if the `sv` column is defined at all in the input TSV, the SV input resources must be present. If the SV column is missing entirely, the SV workflow is never invoked, so no checks are made against the SV reference data.
+> the SV reference resources (`svafotate_bed`, `mane_gtf`, `svannotate_noncoding_bed`) must be present for every run, even if no cohort has an `sv` VCF. SV annotation is decided per row: cohorts with an empty or absent `sv` cell skip it.
 
 The optional `str` column takes a bgzipped multi-sample STR VCF, as written by `talos.scripts.stripy_json_to_vcf` from
 per-sample STRipy JSON reports. It is not annotated, and is passed straight to `ValidateMOI`. See
