@@ -101,11 +101,13 @@ or thin invocations of talos modules using `python -m talos.MODULE`. Most module
    current month's ClinvArbitration echtvar zip to every shard each cycle. `StartupChecks` runs on
    the first shard per cohort before anything else.
 
-`main.nf` runs 2+3 and is the only run entrypoint; reanalysis cycles just re-run it. Annotation
+2+3 live in the shared `TALOS_PIPELINE` (`nextflow/talos_pipeline.nf`), which takes one Map per cohort
+(every input TSV column plus `annotated_dir`/`analysis_dir`). `main.nf` is a thin entrypoint over it that
+builds those rows from `--input_tsv`; reanalysis cycles just re-run it. Annotation
 products publish to `${outdir}/${cohort}_annotated/`, analysis results to `${outdir}/${cohort}_analysis_YYYYMMDD/`.
 Publishing is process `publishDir`, never workflow outputs (`docs/adr/0001`): the entrypoint computes each
-cohort's `annotated_dir`/`analysis_dir` and carries them in the cohort tuples (`ch_meta` ends with
-`analysis_dir`); subworkflows and modules never build output paths themselves.
+cohort's `annotated_dir`/`analysis_dir` and carries them in the cohort rows (`ch_meta` ends with
+`analysis_dir`); `TALOS_PIPELINE`, subworkflows and modules never build output paths themselves.
 
 ### Channel shape in talos.nf
 

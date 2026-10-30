@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * Outputs are published with process `publishDir` instead of workflow outputs (the `output {}` block), so each cohort can be given its own output location (see `docs/adr/0001-publishdir-over-workflow-outputs.md`). The entrypoint decides each cohort's annotated and analysis directories and passes them down to the processes that publish. The output layout is unchanged
   * `main.nf` takes its output root from the required `--outdir` param. `-output-dir` / `outputDir` is no longer read
   * `preparation.nf` publishes each newly generated resource directly to `params.processed_annotations`, and no longer needs an output directory
+  * The annotation → SV annotation → analysis wiring moved out of `main.nf` into a shared `TALOS_PIPELINE` workflow (`nextflow/talos_pipeline.nf`), which takes one row per cohort with its output directories. `main.nf` now only validates params, builds those rows from the input TSV, and writes the next-cycle TSV. Process names gain a `TALOS_PIPELINE:` prefix, so `-resume` won't reuse tasks cached by earlier runs
 
 ## Removed
 
