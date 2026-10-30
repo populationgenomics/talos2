@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]
 
+## Added
+
+  * Optional `sv_annotated` input TSV column: an already annotated SV VCF (e.g. GATK-SV output) which bypasses SV annotation and goes straight to SV filtering. Setting both `sv` and `sv_annotated` on one row is an error
+
 ## Changed
 
   * Outputs are published with process `publishDir` instead of workflow outputs (the `output {}` block), so each cohort can be given its own output location (see `docs/adr/0001-publishdir-over-workflow-outputs.md`). The entrypoint decides each cohort's annotated and analysis directories and passes them down to the processes that publish. The output layout is unchanged

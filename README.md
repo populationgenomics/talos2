@@ -112,6 +112,7 @@ The inputs for the Talos workflow are:
 - **seqr_map**: optional, path to ID mapping to generate hyperlinks to Seqr in the HTML report
 - **mito**: optional, path to mitochondrial variants joint-called VCF
 - **sv**: optional, path to joint-called SV VCF
+- **sv_annotated**: optional, path to an already annotated SV VCF, which skips SV annotation. Mutually exclusive with `sv`, see [SV Annotation](docs/SvAnnotation.md#pre-annotated-sv-vcfs)
 
 The TSV file can contain any number of rows, each representing a distinct Cohort. A parallel Annotation & Talos run will be triggered for each input row, writing to a distinct output folder. An example TSV file has been provided to demonstrate.
 

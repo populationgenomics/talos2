@@ -27,6 +27,19 @@ To utilise this functionality, add a `sv` column to the input TSV, pointing to a
 the output of GATK-SV (multiple variant callers, with resolved calls) and GATK's gCNV. The decision is made per row:
 cohorts with an empty or absent `sv` cell skip SV annotation and filtering.
 
+## Pre-annotated SV VCFs
+
+If a cohort's SV VCF has already been annotated (e.g. the output of GATK-SV's own annotation stage), put it in the
+`sv_annotated` column instead of `sv`. It skips `SV_ANNOTATION` entirely and goes straight to `RunSvFiltering`.
+The VCF must:
+
+- be bgzipped, with a `.tbi` index alongside it (`<vcf>.tbi`)
+- carry SVAnnotate's consequence fields (`PREDICTED_LOF` etc.)
+- carry population frequencies as `<prefix>_sv_AF` and `<prefix>_sv_SVID`, where `<prefix>` is the cohort config's
+  `RunSvFiltering.gnomad_population`. These fields are not renamed, so set the config to match the VCF
+
+A row can set `sv` or `sv_annotated`, not both; the run fails before any task starts if one does.
+
 The SV reference data (`svafotate_bed`, `mane_gtf`, `svannotate_noncoding_bed`, all downloaded by
 `large_files/gather_files.sh`) is required for every run, whether or not any cohort has SV data. `ref_dict` is only
 generated when there is SV annotation to do.
