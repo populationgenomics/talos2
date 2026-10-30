@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--changelog-start-->
 <!--latest-start-->
 
+[Unreleased]
+
+## Changed
+
+  * Outputs are published with process `publishDir` instead of workflow outputs (the `output {}` block), so each cohort can be given its own output location (see `docs/adr/0001-publishdir-over-workflow-outputs.md`). The entrypoint decides each cohort's annotated and analysis directories and passes them down to the processes that publish. The output layout is unchanged
+  * `main.nf` takes its output root from the required `--outdir` param. `-output-dir` / `outputDir` is no longer read
+  * `preparation.nf` publishes each newly generated resource directly to `params.processed_annotations`, and no longer needs an output directory
+
+## Removed
+
+  * `params.annotated_dir`. Annotation products are always read from, and written to, `<outdir>/<cohort>_annotated`
+  * The startup check comparing the output directory with `params.processed_annotations`
+  * `workflow.output.mode` and `outputDir` from `nextflow.config`
+
 [0.6.0] - 2026-10
 
 ## Added

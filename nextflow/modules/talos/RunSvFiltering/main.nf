@@ -1,8 +1,9 @@
 process RunSvFiltering {
     container params.container
+    publishDir { analysis_dir }, mode: 'copy'
 
     input:
-        tuple val(cohort), path(sv_vcf), path(sv_index), path(panelapp_data), path(pedigree), path(talos_config)
+        tuple val(cohort), path(sv_vcf), path(sv_index), path(panelapp_data), path(pedigree), path(talos_config), val(analysis_dir)
         path mane_json
 
     output:

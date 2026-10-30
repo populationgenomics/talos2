@@ -17,7 +17,7 @@ normalise, region-filter, split and echtvar steps are all SNV-specific and would
 SV input is a single joint-called VCF with no equivalent of the shards / ss_vcf_dir branching.
 
 Every step is gated per-cohort. A cohort is skipped entirely if it has no SV VCF, or if its final annotated
-VCF is already present in the output directory - SVAnnotate and SVAFotate are both expensive enough, and the
+VCF is already present in the cohort's annotated directory - SVAnnotate and SVAFotate are both expensive enough, and the
 inputs stable enough, that re-running them on an unchanged callset is pure waste.
 */
 
@@ -31,6 +31,7 @@ include { PrepareSvForSvAnnotate } from './modules/annotation/PrepareSvForSvAnno
 workflow SV_ANNOTATION {
     take:
         ch_ref_genome
+        // one entry per cohort: [cohort, sv_vcf, config, annotated_dir]
         ch_sv_inputs
 
     main:
@@ -53,22 +54,21 @@ workflow SV_ANNOTATION {
     }
     ch_svafotate_bed = channel.fromPath(params.svafotate_bed, checkIfExists: true).first()
 
-    // previously annotated SV VCFs are read from the same root as the small-variant shards.
+    // previously annotated SV VCFs are read from the cohort's annotated directory, alongside its small-variant shards.
     // keep this a Path and resolve() against it - interpolating a cloud Path into a string
     // drops the gs:// scheme, so the exists() check silently ran against the local filesystem
-    def annotated_root = file(params.annotated_dir ?: workflow.outputDir)
 
     // split cohorts three ways - no SV data ([] is falsy), already annotated, or work to do
-    // row is tuple(cohort, sv_vcf, config)
+    // row is tuple(cohort, sv_vcf, config, annotated_dir)
     ch_branched = ch_sv_inputs.branch { row ->
         no_sv:    !row[1]
-        complete: annotated_root.resolve("${row[0]}_annotated").resolve("${row[0]}_sv_annotated.vcf.bgz").exists()
+        complete: file(row[3]).resolve("${row[0]}_sv_annotated.vcf.bgz").exists()
         pending:  true
     }
 
-    // pick the previously annotated VCF up from the output directory instead of regenerating it
+    // pick the previously annotated VCF up from the annotated directory instead of regenerating it
     ch_complete = ch_branched.complete.map { row ->
-        def annotated = annotated_root.resolve("${row[0]}_annotated").resolve("${row[0]}_sv_annotated.vcf.bgz")
+        def annotated = file(row[3]).resolve("${row[0]}_sv_annotated.vcf.bgz")
         println "Annotated SV VCF for ${row[0]} already exists (${annotated.toUriString()}), skipping SV annotation"
         def tbi = annotated.resolveSibling("${annotated.name}.tbi")
         if (!tbi.exists()) {
@@ -81,8 +81,8 @@ workflow SV_ANNOTATION {
         tuple(row[0], row[1], file("${row[1]}.tbi", checkIfExists: true))
     }
 
-    // the config travels with each cohort, and is only needed for the rename step
-    ch_pending_configs = ch_branched.pending.map { row -> tuple(row[0], row[2]) }
+    // the config and annotated dir travel with each cohort, and are only needed for the (published) rename step
+    ch_pending_configs = ch_branched.pending.map { row -> tuple(row[0], row[2], row[3]) }
 
     // SVAnnotate needs a sequence dictionary, which large_files does not ship alongside ref.fa.
     // Building it is gated on there being pending work - `first()` over an empty channel emits nothing, so
@@ -120,6 +120,4 @@ workflow SV_ANNOTATION {
     emit:
         // every cohort with SV data, newly annotated and reused alike
         annotated = RenameSvAfFields.out.mix(ch_complete)
-        // newly annotated only - these need publishing, reused ones are already on disk
-        fresh = RenameSvAfFields.out
 }

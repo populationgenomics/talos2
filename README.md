@@ -67,9 +67,7 @@ There are 3 main file paths you need to provide. The default locations for these
 
 * `params.large_files` or `--large_files`: the directory containing large raw annotation sources. This defaults to `large_files` in the project root for the test workflow to run, but for regular use this should be in a storage drive accessible to your HPC/Cloud/local compute environment. All workflows need to reference these files.
 * `params.processed_annotations` or `--processed_annotations`: the outputs of the preparation sub-workflow, which processes raw 'large files' into annotation-ready resources
-* `workflow.outputDir` or `-output-dir`: the root folder/bucket for all workflow outputs. For the preparation workflow this should point to the same folder as `params.processed_annotations`, for the main workflow this should point to where you want the per-cohort results to be written to.
-
-For Nextflow deployments which allow for `-output-dir` to be used as a parameter, the `outputDir` can be set using a CLI flag. For environments which don't support `-output-dir` (e.g. Seqera), setting `outputDir` in the `nextflow.config` file can be used to control workflow outputs.
+* `params.outdir` or `--outdir`: the root folder/bucket for the main workflow's per-cohort outputs. Required by `main.nf`, unused by `preparation.nf`, which always writes to `params.processed_annotations`.
 
 ### **1. Install Requirements**
 
@@ -96,8 +94,7 @@ nextflow \
     -c nextflow.config \
     run preparation.nf \
     [--processed_annotations <processed_annotations_path>] \
-    [--large_files <large_files_path>] \
-    -output-dir <processed_annotations_path>
+    [--large_files <large_files_path>]
 ```
 
 ### **4. Run Annotation & Talos Combined Workflow**
@@ -126,7 +123,7 @@ The input TSV uses two columns to locate variant input; `path` and `type`. `path
 2. **shards** a directory of pre-sharded multisample VCF fragments, each shard containing all samples. The annotation and analysis workflows will be parallelised across these shards.
 3. **ss_vcf_dir** single-sample VCFs, to be merged in the workflow, then sharded. These are detected using a glob, with the file extension controlled by `params.input_vcf_extension` (defaults to "vcf.bgz")
 
-Workflow outputs are written per cohort: annotation products (annotated VCF shards, a shard manifest, and the annotated SV VCF where relevant) to `{workflow.outputDir}/{cohort}_annotated`, and analysis results to a dated `{workflow.outputDir}/{cohort}_analysis_YYYYMMDD`. The output directory should be outside this repository, though for demonstration purposes the default is `./nextflow`.
+Outputs are written per cohort: annotation products (annotated VCF shards, a shard manifest, and the annotated SV VCF where relevant) to `{outdir}/{cohort}_annotated`, and analysis results to a dated `{outdir}/{cohort}_analysis_YYYYMMDD`. A proposed input TSV for the next reanalysis cycle, `talos_input_YYYYMMDD.tsv`, is written to the root of `{outdir}`. The output directory should be outside this repository.
 
 The [main.nf](main.nf) workflow runs annotation and analysis together. Annotation is skipped for any cohort whose shard manifest already exists in `{cohort}_annotated`, so the same command is used for the first run and for every reanalysis cycle:
 
@@ -137,7 +134,7 @@ nextflow \
   --input_tsv nextflow/inputs/test.tsv \
   --processed_annotations <processed_annotations_path> \
   --large_files <large_files_path> \
-  -output-dir <path_to_output_dir>
+  --outdir <path_to_output_dir>
 ```
 
 >**For best results we advise repeating the Talos workflow on a regular cadence** — just re-run the command above; delete a cohort's `{cohort}_annotated` directory to force re-annotation (e.g. when MANE data is updated).
@@ -301,8 +298,8 @@ per-sample STRipy JSON reports. It is not annotated, and is passed straight to `
 
 ### Outputs:
 
- - `{workflow.outputDir}/{cohort}_annotated` contains the annotated VCF shards and a manifest file.
- - `{workflow.outputDir}/{cohort}_analysis_YYYYMMDD` will contain the analysis outputs (HTML/JSON).
+ - `{outdir}/{cohort}_annotated` contains the annotated VCF shards and a manifest file.
+ - `{outdir}/{cohort}_analysis_YYYYMMDD` will contain the analysis outputs (HTML/JSON).
 
 ## **📓 Citation**
 

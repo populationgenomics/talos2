@@ -36,9 +36,7 @@ There are 3 main file paths you need to provide. The default locations for these
 
 * `params.large_files` or `--large_files`: the directory containing large raw annotation sources. This defaults to `large_files` in the project root for the test workflow to run, but for regular use this should be in a storage drive accessible to your HPC/Cloud/local compute environment. All workflows need to reference these files.
 * `params.processed_annotations` or `--processed_annotations`: the outputs of the preparation sub-workflow, which processes raw 'large files' into annotation-ready resources
-* `workflow.outputDir` or `-output-dir`: the root folder/bucket for all workflow outputs. For the preparation workflow this should point to the same folder as `params.processed_annotations`, for the main workflow this should point to where you want the per-cohort results to be written to.
-
-For Nextflow deployments which allow for `-output-dir` to be used as a parameter, the `outputDir` can be set using a CLI flag. For environments which don't support `-output-dir` (e.g. Seqera), setting `outputDir` in the `nextflow.config` file can be used to control workflow outputs.
+* `params.outdir` or `--outdir`: the root folder/bucket for the main workflow's per-cohort outputs. Required by `main.nf`, unused by `preparation.nf`, which always writes to `params.processed_annotations`.
 
 ### **1. Install Requirements**
 
@@ -65,8 +63,7 @@ nextflow \
     -c nextflow.config \
     run preparation.nf \
     [--processed_annotations <processed_annotations_path>] \
-    [--large_files <large_files_path>] \
-    -output-dir <processed_annotations_path>
+    [--large_files <large_files_path>]
 ```
 
 ### **4. Run Annotation & Talos Combined Workflow**
@@ -95,7 +92,7 @@ The input TSV uses two columns to locate variant input; `path` and `type`. `path
 2. **shards** a directory of pre-sharded multisample VCF fragments, each shard containing all samples. The annotation and analysis workflows will be parallelised across these shards.
 3. **ss_vcf_dir** single-sample VCFs, to be merged in the workflow, then sharded. These are detected using a glob, with the file extension controlled by `params.input_vcf_extension` (defaults to "vcf.bgz")
 
-Workflow outputs are written per cohort: annotation products (annotated VCF shards, a shard manifest, and the annotated SV VCF where relevant) to `{workflow.outputDir}/{cohort}_annotated`, and analysis results to a dated `{workflow.outputDir}/{cohort}_analysis_YYYYMMDD`. The output directory should be outside this repository, though for demonstration purposes the default is `./nextflow`.
+Outputs are written per cohort: annotation products (annotated VCF shards, a shard manifest, and the annotated SV VCF where relevant) to `{outdir}/{cohort}_annotated`, and analysis results to a dated `{outdir}/{cohort}_analysis_YYYYMMDD`. A proposed input TSV for the next reanalysis cycle, `talos_input_YYYYMMDD.tsv`, is written to the root of `{outdir}`. The output directory should be outside this repository.
 
 The [main.nf](https://github.com/populationgenomics/talos/blob/main/main.nf) workflow runs annotation and analysis together. Annotation is skipped for any cohort whose shard manifest already exists in `{cohort}_annotated`, so the same command is used for the first run and for every reanalysis cycle:
 
@@ -106,7 +103,7 @@ nextflow \
   --input_tsv nextflow/inputs/test.tsv \
   --processed_annotations <processed_annotations_path> \
   --large_files <large_files_path> \
-  -output-dir <path_to_output_dir>
+  --outdir <path_to_output_dir>
 ```
 
 >**For best results we advise repeating the Talos workflow on a regular cadence** — just re-run the command above; delete a cohort's `{cohort}_annotated` directory to force re-annotation (e.g. when MANE data is updated).
@@ -115,17 +112,16 @@ nextflow \
 
 Outputs are split into two directories per cohort:
 
-* `{workflow.outputDir}/{cohort}_annotated` — annotation products: the annotated VCF shards, a
+* `{outdir}/{cohort}_annotated` — annotation products: the annotated VCF shards, a
   `{cohort}_manifest.json` naming exactly the shards produced, and the annotated SV VCF where SV data was
   supplied. The annotation sub-workflow only needs to be run once per dataset — these files are reused for every
   subsequent reanalysis cycle, and the whole directory is safe to delete to force clean re-annotation without
   touching any analysis results.
-* `{workflow.outputDir}/{cohort}_analysis_YYYYMMDD` — analysis results (report HTML, results JSON, PanelApp
+* `{outdir}/{cohort}_analysis_YYYYMMDD` — analysis results (report HTML, results JSON, PanelApp
   data, labelled VCFs), one directory per analysis date.
 
 For subsequent cycles, run the same `main.nf` command again: annotation is skipped for every cohort whose
-shard manifest is already present, and only the analysis stages re-run. Use `--annotated_dir` to read
-annotation products from a different location than the run publishes its results to.
+shard manifest is already present, and only the analysis stages re-run.
 
 !!! tip "Reanalysis cadence"
     For best results, re-run the Talos workflow on a regular cadence — monthly or quarterly is typical. See the [Reanalysis](Reanalysis.md) page for how prior results are folded into new runs.

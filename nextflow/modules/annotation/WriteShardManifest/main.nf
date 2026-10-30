@@ -4,8 +4,10 @@
 // so shards left behind by earlier runs (e.g. a different vcf_split_n) can never leak in.
 // native (exec) process - runs on the head node, no container required
 process WriteShardManifest {
+    publishDir { annotated_dir }, mode: 'copy'
+
     input:
-        tuple val(cohort), val(shard_names), val(source), val(type)
+        tuple val(cohort), val(shard_names), val(source), val(type), val(annotated_dir)
 
     output:
         tuple val(cohort), path("${cohort}_manifest.json")

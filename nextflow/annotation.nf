@@ -56,6 +56,8 @@ workflow ANNOTATION {
 	take:
 		ch_gff
 		ch_ref_genome
+		// one entry per cohort: [cohort, path, type, annotated_dir] - annotated_dir is where this cohort's
+		// annotation products are published, and where earlier ones are looked for
 		ch_inputs
 
     main:
@@ -70,18 +72,17 @@ workflow ANNOTATION {
 
     // skip annotation entirely for cohorts whose shard manifest already exists - reuse the
     // published shards instead. Annotation is expensive and its inputs stable; delete the
-    // cohort's `${cohort}_annotated` directory to force re-annotation
+    // cohort's annotated directory to force re-annotation
     // keep this a Path and resolve() against it - interpolating a cloud Path into a string
     // drops the gs:// scheme, so the exists() check silently ran against the local filesystem
-    def annotated_root = file(params.annotated_dir ?: workflow.outputDir)
     ch_reuse_branched = ch_inputs.branch { row ->
-        complete: annotated_root.resolve("${row[0]}_annotated").resolve("${row[0]}_manifest.json").exists()
+        complete: file(row[3]).resolve("${row[0]}_manifest.json").exists()
         pending:  true
     }
 
     ch_complete_shards = ch_reuse_branched.complete.flatMap { row ->
         def cohort = row[0]
-        def dir = annotated_root.resolve("${cohort}_annotated")
+        def dir = file(row[3])
         def manifest = dir.resolve("${cohort}_manifest.json")
         println "Annotated shards for ${cohort} already exist (${manifest}), skipping annotation"
         shardsFromManifest(cohort, dir, manifest, row[1])
@@ -94,13 +95,13 @@ workflow ANNOTATION {
     }
 
     // Process shards
-    ch_from_shards = ch_inputs_branched.shards.flatMap { cohort, path, _type ->
+    ch_from_shards = ch_inputs_branched.shards.flatMap { cohort, path, _type, _annotated_dir ->
         def vcfs = files("${path}/*.${params.input_vcf_extension}")
         vcfs.collect { vcf -> tuple(cohort, vcf) }
     }
 
     // Process single-sample components
-    ch_vcf_dir_inputs = ch_inputs_branched.vcf_dir.map { cohort, path, _type ->
+    ch_vcf_dir_inputs = ch_inputs_branched.vcf_dir.map { cohort, path, _type, _annotated_dir ->
         def vcfs = files("${path}/*.${params.input_vcf_extension}")
         def tbis = vcfs.collect { vcf -> file("${vcf}.tbi") }
         tuple(cohort, vcfs, tbis)
@@ -113,7 +114,7 @@ workflow ANNOTATION {
     ch_merged_vcfs = MergeVcfsWithBcftools.out
 
     // Process single VCF - reuse an index sitting next to the input, build one otherwise
-    ch_single_vcfs = ch_inputs_branched.single_vcf.map { cohort, path, _type ->
+    ch_single_vcfs = ch_inputs_branched.single_vcf.map { cohort, path, _type, _annotated_dir ->
         tuple(cohort, file(path, checkIfExists: true))
     }
     // sibling resolution stays on the Path object. Interpolating a cloud path into a string
@@ -157,11 +158,15 @@ workflow ANNOTATION {
         ch_ref_genome,
     )
 
+    // where each pending cohort's annotation products are published
+    ch_annotated_dirs = ch_reuse_branched.pending.map { row -> tuple(row[0], row[3]) }
+
     // echtvar + bcftools csq on the sites-only copy, INFO lifted onto the full-width shard.
     // One process, not a chain: the channel is keyed by cohort only, so the full-width shard could
-    // not be joined back to its annotated sites downstream without threading a shard key throughout
+    // not be joined back to its annotated sites downstream without threading a shard key throughout.
+    // combine (not join) - every shard of a cohort carries that cohort's annotated dir
     AnnotateShard(
-        NormaliseVcf.out,
+        NormaliseVcf.out.combine(ch_annotated_dirs, by: 0),
         ch_gnomad_zip,
         ch_alphamissense_zip,
         ch_gff,
@@ -180,8 +185,4 @@ workflow ANNOTATION {
         // one entry per shard, as [cohort, vcf], newly annotated and reused alike - the per-run workflow keeps the scatter open.
         // The index is dropped here: the per-run workflow streams every shard whole, so it never needs one
     	shards = AnnotateShard.out.map { cohort, vcf, _tbi -> tuple(cohort, vcf) }.mix(ch_complete_shards)
-        // newly annotated shards only, as [cohort, vcf, tbi] - these need publishing, reused ones are already on disk
-        new_shards = AnnotateShard.out
-        // one entry per newly annotated cohort, as [cohort, manifest_json]
-        manifest = WriteShardManifest.out
 }

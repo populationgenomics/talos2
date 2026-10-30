@@ -1,5 +1,6 @@
 process MakeClinvarbitrationPm5 {
     container params.container
+    publishDir params.processed_annotations, mode: 'copy'
 
     input:
         path annotated_snv

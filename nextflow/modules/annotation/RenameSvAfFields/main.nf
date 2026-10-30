@@ -1,8 +1,9 @@
 process RenameSvAfFields {
     container params.container
+    publishDir { annotated_dir }, mode: 'copy'
 
     input:
-        tuple val(cohort), path(vcf), path(talos_config)
+        tuple val(cohort), path(vcf), path(talos_config), val(annotated_dir)
 
     // Max_AF -> {prefix}_sv_AF, Best_gnomAD_ID -> {prefix}_sv_SVID, prefix read from the Talos config
     output:

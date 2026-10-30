@@ -17,8 +17,12 @@ nextflow.enable.dsl=2
     A reanalysis cycle is simply re-running this workflow; delete a cohort's `${cohort}_annotated`
     directory to force re-annotation.
 
+    Outputs are published with publishDir, not workflow outputs - see docs/adr/0001. This entrypoint
+    decides each cohort's output directories and passes them down in the cohort tuples; nothing below
+    it knows the output layout.
+
     Usage:
-    nextflow run main.nf --input_tsv [path] [other params...]
+    nextflow run main.nf --input_tsv [path] --outdir [path] [other params...]
 */
 
 // Import specific workflows
@@ -30,6 +34,20 @@ include { TALOS } from './nextflow/talos'
 // annotation products go to the undated ${cohort}_annotated, which is reused across cycles
 def runDate() {
     workflow.start.format(java.time.format.DateTimeFormatter.ofPattern('yyyyMMdd'))
+}
+
+// output directories are carried as plain Strings built from params.outdir (itself a String), never
+// by interpolating a Path - that drops the gs:// scheme from cloud paths
+def outRoot() {
+    params.outdir.toString().replaceAll('/+$', '')
+}
+
+def annotatedDir(cohort) {
+    "${outRoot()}/${cohort}_annotated".toString()
+}
+
+def analysisDir(cohort) {
+    "${outRoot()}/${cohort}_analysis_${runDate()}".toString()
 }
 
 // build the content of a proposed input TSV for the next reanalysis cycle: this run's input TSV
@@ -63,10 +81,10 @@ def nextInputTsv(input_tsv, resultsByCohort) {
 
 workflow {
 	main:
-	if (file(workflow.outputDir).simpleName == file(params.processed_annotations).simpleName) {
-    	println "Output Directory (${workflow.outputDir}) is probably not set correctly, use config or `-output-dir`"
+	if (!params.outdir) {
+		println "Required --outdir argument not provided"
 		exit 1
-    }
+	}
 
 	if (!file(params.mane_json).exists()) {
 		println "MANE JSON not available, please run the Talos Prep workflow (--entry preparation)"
@@ -89,7 +107,7 @@ workflow {
 
 	ch_inputs = channel.fromPath(params.input_tsv)
 		.splitCsv(header: true, sep: '\t')
-		.map { row -> tuple(row.cohort, row.path, row.type) }
+		.map { row -> tuple(row.cohort, row.path, row.type, annotatedDir(row.cohort)) }
 
 	// per-cohort metadata, one row per cohort - the annotated shards are carried separately
 	ch_talos_meta = channel.fromPath(params.input_tsv)
@@ -105,6 +123,7 @@ workflow {
 			row.mito ? file(row.mito, checkIfExists: true) : [],
 			// STR VCFs (from stripy_json_to_vcf) need no annotation, they go straight to ValidateMOI
 			row.str ? file(row.str, checkIfExists: true) : [],
+			analysisDir(row.cohort),
 		) }
 
 	// the SV path is entirely optional, and only wired up if the input TSV declares an `sv` column.
@@ -112,7 +131,6 @@ workflow {
 	def sv_requested = file(params.input_tsv).withReader { handle -> handle.readLine() }.tokenize('\t').contains('sv')
 
 	ch_sv_annotated = channel.empty()
-	ch_sv_fresh = channel.empty()
 
 	if (sv_requested) {
 		ch_sv_inputs = channel.fromPath(params.input_tsv)
@@ -121,6 +139,7 @@ workflow {
 				row.cohort,
 				row.sv ? file(row.sv, checkIfExists: true) : [],
 				file(row.config, checkIfExists: true),
+				annotatedDir(row.cohort),
 			) }
 
 		SV_ANNOTATION(
@@ -129,7 +148,6 @@ workflow {
 		)
 
 		ch_sv_annotated = SV_ANNOTATION.out.annotated
-		ch_sv_fresh = SV_ANNOTATION.out.fresh
 	}
 
 	ANNOTATION(
@@ -148,57 +166,12 @@ workflow {
 	)
 
 	// a ready-to-use input TSV for the next reanalysis cycle - identical to this run's input, with
-	// `history` repointed at the results JSON published for that cohort by this run. The paths are
-	// the published destinations, which don't exist until the run completes, so this is a proposal
-	// to be reviewed, not an output consumed by anything in this run
-	ch_next_input_tsv = TALOS.out.json
-		.map { cohort, results_json -> tuple(cohort, "${workflow.outputDir}/${cohort}_analysis_${runDate()}/${results_json.name}".toString()) }
+	// `history` repointed at the results JSON published for that cohort by this run, written to the
+	// root of the output directory. The paths are the published destinations, which don't exist until
+	// the run completes, so this is a proposal to be reviewed, not an output consumed by anything in this run
+	TALOS.out.json
+		.map { cohort, results_json -> tuple(cohort, "${analysisDir(cohort)}/${results_json.name}".toString()) }
 		.collect(flat: false)
 		.map { pairs -> nextInputTsv(file(params.input_tsv), pairs.collectEntries { pair -> pair }) }
-		.collectFile(name: "talos_input_${runDate()}.tsv")
-
-	publish:
-		next_input_tsv = ch_next_input_tsv
-		// newly annotated products only - reused shards/SV VCFs are already published on disk
-		annotated = ANNOTATION.out.new_shards
-		annotated_manifest = ANNOTATION.out.manifest
-		sv_annotated = ch_sv_fresh
-    	html = TALOS.out.html
-		json = TALOS.out.json
-		labelled = TALOS.out.labelled
-		labelled_sv = TALOS.out.labelled_sv
-		panelapp = TALOS.out.panelapp
-}
-
-output {
-	// proposed input TSV for the next cycle - published to the root of the output directory
-	next_input_tsv {
-	}
-	// annotation products - undated, reused by every subsequent reanalysis cycle, and safe to
-	// delete wholesale to force re-annotation without touching any analysis results
-	annotated {
-		path { id, _vcf, _tbi -> "${id}_annotated" }
-	}
-	annotated_manifest {
-		path { id, _manifest -> "${id}_annotated" }
-	}
-	sv_annotated {
-		path { id, _vcf, _vcf_idx -> "${id}_annotated" }
-	}
-	// analysis results - one directory per analysis date
-	html {
-		path { id, _html -> "${id}_analysis_${runDate()}" }
-	}
-	json {
-		path { id, _json -> "${id}_analysis_${runDate()}" }
-	}
-	panelapp {
-		path { id, _panelapp -> "${id}_analysis_${runDate()}" }
-	}
-	labelled {
-		path { id, _labelled, _labelled_idx -> "${id}_analysis_${runDate()}" }
-	}
-	labelled_sv {
-		path { id, _labelled_sv, _labelled_sv_idx -> "${id}_analysis_${runDate()}" }
-	}
+		.collectFile(name: "talos_input_${runDate()}.tsv", storeDir: file(outRoot()))
 }

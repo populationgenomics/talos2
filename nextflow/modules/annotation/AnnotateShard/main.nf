@@ -1,5 +1,6 @@
 process AnnotateShard {
     container params.container
+    publishDir { annotated_dir }, mode: 'copy'
 
     // annotate one shard. echtvar (gnomAD + AlphaMissense) and bcftools csq run on the sites-only
     // VCF, which is a small fraction of the full-width shard for any multi-sample cohort. The INFO
@@ -15,7 +16,7 @@ process AnnotateShard {
     // csq's per-sample FORMAT/BCSQ bitmask is not produced (there are no samples in the sites file)
     // - nothing downstream reads it, only INFO/BCSQ
     input:
-        tuple val(cohort), path(full_bcf), path(full_csi), path(sites_vcf)
+        tuple val(cohort), path(full_bcf), path(full_csi), path(sites_vcf), val(annotated_dir)
         path gnomad_zip
         path am_zip
         path gff3
