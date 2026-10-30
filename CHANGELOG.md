@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
   * Optional `sv_annotated` input TSV column: an already annotated SV VCF (e.g. GATK-SV output) which bypasses SV annotation and goes straight to SV filtering. Setting both `sv` and `sv_annotated` on one row is an error
+  * Small-variant and `sv` VCFs are subset to the pedigree's samples during annotation, dropping variants no pedigree sample carries, so a dataset-wide callset is annotated and stored at cohort size. VCFs already matching the pedigree are unchanged. Pedigree samples missing from a VCF are a warning, no shared samples an error. See `docs/Pedigree.md`
 
 ## Changed
 

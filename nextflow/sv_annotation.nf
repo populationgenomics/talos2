@@ -31,7 +31,8 @@ include { PrepareSvForSvAnnotate } from './modules/annotation/PrepareSvForSvAnno
 workflow SV_ANNOTATION {
     take:
         ch_ref_genome
-        // one entry per cohort: [cohort, sv_vcf, config, annotated_dir]
+        // one entry per cohort: [cohort, sv_vcf, config, pedigree, annotated_dir] - the VCF is cut down to the
+        // pedigree's samples before annotation
         ch_sv_inputs
 
     main:
@@ -59,16 +60,16 @@ workflow SV_ANNOTATION {
     // drops the gs:// scheme, so the exists() check silently ran against the local filesystem
 
     // split cohorts three ways - no SV data ([] is falsy), already annotated, or work to do
-    // row is tuple(cohort, sv_vcf, config, annotated_dir)
+    // row is tuple(cohort, sv_vcf, config, pedigree, annotated_dir)
     ch_branched = ch_sv_inputs.branch { row ->
         no_sv:    !row[1]
-        complete: file(row[3]).resolve("${row[0]}_sv_annotated.vcf.bgz").exists()
+        complete: file(row[4]).resolve("${row[0]}_sv_annotated.vcf.bgz").exists()
         pending:  true
     }
 
     // pick the previously annotated VCF up from the annotated directory instead of regenerating it
     ch_complete = ch_branched.complete.map { row ->
-        def annotated = file(row[3]).resolve("${row[0]}_sv_annotated.vcf.bgz")
+        def annotated = file(row[4]).resolve("${row[0]}_sv_annotated.vcf.bgz")
         println "Annotated SV VCF for ${row[0]} already exists (${annotated.toUriString()}), skipping SV annotation"
         def tbi = annotated.resolveSibling("${annotated.name}.tbi")
         if (!tbi.exists()) {
@@ -78,11 +79,11 @@ workflow SV_ANNOTATION {
     }
 
     ch_pending_vcfs = ch_branched.pending.map { row ->
-        tuple(row[0], row[1], file("${row[1]}.tbi", checkIfExists: true))
+        tuple(row[0], row[1], file("${row[1]}.tbi", checkIfExists: true), row[3])
     }
 
     // the config and annotated dir travel with each cohort, and are only needed for the (published) rename step
-    ch_pending_configs = ch_branched.pending.map { row -> tuple(row[0], row[2], row[3]) }
+    ch_pending_configs = ch_branched.pending.map { row -> tuple(row[0], row[2], row[4]) }
 
     // SVAnnotate needs a sequence dictionary, which large_files does not ship alongside ref.fa.
     // Building it is gated on there being pending work - `first()` over an empty channel emits nothing, so
@@ -91,7 +92,7 @@ workflow SV_ANNOTATION {
 
     if (!file(params.ref_dict).exists()) {
         CreateSequenceDictionary(
-            ch_ref_genome.combine(ch_work_pending).map { ref_fa, _cohort, _vcf, _tbi -> ref_fa },
+            ch_ref_genome.combine(ch_work_pending).map { ref_fa, _cohort, _vcf, _tbi, _pedigree -> ref_fa },
         )
         ch_ref_dict = CreateSequenceDictionary.out.first()
     } else {
