@@ -181,7 +181,9 @@ start_download https://www.fr.mitomap.org/downloads/mitotip_scores.txt
 
 start_download "https://mitimpact.mcb2lab.org/cdn/nAPOGEE_v1.0.0.txt.zip"
 
-start_download "https://mitimpact.mcb2lab.org/cdn/MitImpact_db_3.1.3.txt.zip"
+# MitImpact 3.1.3 has been superseded by MitImpact 4 (comma-delimited CSV inside the zip).
+# The v4 zip is downloaded manually from https://mitimpact.mcb2lab.org/downloads and saved here as MitImpact4_V059.zip
+# start_download "https://mitimpact.mcb2lab.org/cdn/MitImpact_db_3.1.3.txt.zip"
 
 # AlphaMissense raw data
 AM="AlphaMissense_hg38.tsv.gz"
