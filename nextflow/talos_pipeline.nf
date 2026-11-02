@@ -114,4 +114,6 @@ workflow TALOS_PIPELINE {
 		// one entry per cohort: [cohort, results_json], the task-local results JSON - its published copy is
 		// <analysis_dir>/<name>
 		json = TALOS.out.json
+		// one entry per cohort: [cohort, report_html], likewise published to <analysis_dir>/<name>
+		html = TALOS.out.html
 }

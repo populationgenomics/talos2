@@ -15,17 +15,19 @@ nextflow.enable.dsl=2
     The first process, InputTsvFromMetamist, finds each cohort's inputs in Metamist and generates the rest
     (pedigree, external IDs, seqr map, per-cohort config) into that cohort's analysis_YYYYMMDD/inputs/. Its TSV
     then feeds TALOS_PIPELINE exactly as main.nf's input TSV would. There is no next-cycle TSV: history is the
-    dataset's latest aip-results analysis in Metamist. This run's results aren't registered there yet - see
-    docs/CpgDeployment.md.
+    dataset's latest aip-results analysis in Metamist. With --metamist, each cohort's results JSON is registered
+    there as aip-results (the next run's history) and its HTML report as aip-report - see docs/CpgDeployment.md.
 
     Outputs are published with publishDir, not workflow outputs - see docs/adr/0001.
 
     Usage:
     nextflow run cpg_main.nf --cohort_ids COH0001,COH0002 --access_level test --sequencing_type genome \
-        --talos_config gs://.../talos.toml [other params...]
+        --talos_config gs://.../talos.toml [--metamist] [other params...]
 */
 
 include { InputTsvFromMetamist } from './nextflow/modules/cpg/InputTsvFromMetamist/main'
+include { RegisterAnalysis as RegisterResults } from './nextflow/modules/cpg/RegisterAnalysis/main'
+include { RegisterAnalysis as RegisterReport } from './nextflow/modules/cpg/RegisterAnalysis/main'
 include { TALOS_PIPELINE } from './nextflow/talos_pipeline'
 
 // fixed once per run - InputTsvFromMetamist writes each cohort's generated inputs under analysis_<runDate>, so the
@@ -52,6 +54,21 @@ def annotatedDir(dataset, cohort) {
 
 def analysisDir(dataset, cohort) {
     "${cohortRoot(dataset, cohort)}/analysis_${runDate()}".toString()
+}
+
+// the Metamist project a dataset's analyses are registered in
+def metamistProject(dataset) {
+    params.access_level == 'test' ? "${dataset}-test".toString() : dataset
+}
+
+// [cohort, project, published URI, meta] for RegisterAnalysis, from a TALOS_PIPELINE emission joined to its cohort row
+def registration(row, published) {
+    tuple(
+        row.cohort,
+        metamistProject(row.cpg_dataset),
+        "${row.analysis_dir}/${published.name}".toString(),
+        [sequencing_type: params.sequencing_type],
+    )
 }
 
 
@@ -94,4 +111,22 @@ workflow {
 		] }
 
 	TALOS_PIPELINE(ch_cohorts)
+
+	// register each cohort's published results JSON (aip-results, the next run's history) and HTML report
+	// (aip-report) against its Metamist cohort. Each waits for its own file to be published, independently
+	if (params.metamist) {
+		ch_rows = ch_cohorts.map { row -> tuple(row.cohort, row) }
+
+		RegisterResults(
+			TALOS_PIPELINE.out.json.join(ch_rows).map { _cohort, json, row -> registration(row, json) },
+			'aip-results',
+			params.metamist_wait_minutes,
+		)
+
+		RegisterReport(
+			TALOS_PIPELINE.out.html.join(ch_rows).map { _cohort, html, row -> registration(row, html) },
+			'aip-report',
+			params.metamist_wait_minutes,
+		)
+	}
 }

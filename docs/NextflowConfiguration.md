@@ -34,7 +34,7 @@ This README documents the parameters used in the nextflow configuration file. So
 
 ## CPG entrypoint
 
-Only `cpg_main.nf` reads these, and there they're all required. `main.nf` ignores them. See
+Only `cpg_main.nf` reads these, and there all but `metamist` and `metamist_wait_minutes` are required. `main.nf` ignores them. See
 [CPG Deployment](CpgDeployment.md).
 
 | **Parameter**     | **Description**                                                                                                                  |
@@ -43,6 +43,8 @@ Only `cpg_main.nf` reads these, and there they're all required. `main.nf` ignore
 | `access_level`    | `test`, `standard` or `full`. `test` publishes to `gs://cpg-<dataset>-test`, the others to `gs://cpg-<dataset>-main`            |
 | `sequencing_type` | `genome` or `exome`                                                                                                              |
 | `talos_config`    | The CPG `talos.toml`. Its `[cohorts.<dataset>]` sections are merged into each cohort's config                                    |
+| `metamist`        | Optional, default `false`. Register each cohort's results JSON (`aip-results`) and HTML report (`aip-report`) in Metamist      |
+| `metamist_wait_minutes` | Optional, default `30`. How long registration waits for each published file                                              |
 
 ## Structural Variant annotation
 

@@ -221,4 +221,6 @@ workflow TALOS {
 
     emit:
     	json = HPOFlagging.out
+    	// [cohort, html]
+    	html = CreateTalosHTML.out
 }

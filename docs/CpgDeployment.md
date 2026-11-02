@@ -16,7 +16,8 @@ nextflow -c nextflow.config run cpg_main.nf \
     --cohort_ids COH0001,COH0002 \
     --access_level test \
     --sequencing_type genome \
-    --talos_config gs://.../talos.toml
+    --talos_config gs://.../talos.toml \
+    --metamist
 ```
 
 | **Parameter**     | **Description**                                                                                                                                |
@@ -26,7 +27,10 @@ nextflow -c nextflow.config run cpg_main.nf \
 | `sequencing_type` | `genome` or `exome`. One per run                                                                                                               |
 | `talos_config`    | The CPG `talos.toml`. Its generic sections, plus that dataset's `[cohorts.<dataset>]` section, make up each cohort's config (see [Config](#config)) |
 
-All four are required. The run exits before any task starts if any is missing or invalid. `input_tsv` and
+| `metamist`        | Optional, default `false`. Register each cohort's results in Metamist, see [Registering results](#registering-results)                        |
+| `metamist_wait_minutes` | Optional, default `30`. How long registration waits for `publishDir` to copy each file                                                  |
+
+The first four are required. The run exits before any task starts if any is missing or invalid. `input_tsv` and
 `outdir` are ignored. All other params (reference data, `processed_annotations`, containers) are the same as
 for `main.nf`. See [Nextflow Configuration](NextflowConfiguration.md).
 
@@ -135,15 +139,33 @@ Set `RunSvFiltering.gnomad_population` to the prefix of GATK-SV's population fre
 (`gnomad_v4.1`) no SV would match a population frequency. See
 [Pre-annotated SV VCFs](SvAnnotation.md#pre-annotated-sv-vcfs).
 
+## Registering results
+
+With `--metamist`, each cohort's published outputs are registered in Metamist, in the cohort's project
+(`<dataset>-test` at the `test` access level), linked to the Metamist cohort, with `meta.sequencing_type`:
+
+| **Analysis type** | **Output**                                           |
+|-------------------|------------------------------------------------------|
+| `aip-results`     | `analysis_YYYYMMDD/<cohort>_full_results_<date>.json` |
+| `aip-report`      | `analysis_YYYYMMDD/<cohort>_report_<date>.html`       |
+
+These are the types Talos v1 registered. Each is a separate task (`RegisterResults`, `RegisterReport`), in the
+Talos container, running `cpg_utils.metamist_registration`. `publishDir` copies in the background, so each
+task polls for its file, for up to `metamist_wait_minutes`, before registering. Registration refuses a file
+that's still missing or isn't in GCS. A failed registration is retried once, then the run stops once its
+running tasks finish.
+
+Without `--metamist`, nothing is registered, and the outputs are only published.
+
 ## Reanalysis
 
-`history` is the dataset's latest `aip-results` analysis. **`cpg_main.nf` doesn't register its results in
-Metamist yet**, so a later run picks up the latest result that was registered, which may be from Talos v1, and
-not the previous `cpg_main.nf` run's results. Registering results is planned as a follow-up change.
+`history` is the dataset's latest `aip-results` analysis. A run with `--metamist` registers its results JSON
+as one, so the next run picks it up. Without `--metamist`, the next run gets the latest result that was
+registered, which may be from Talos v1.
 
 ## Known gaps
 
 - Metamist access from a Google Batch task hasn't been tested yet. Locally, without credentials,
   `InputTsvFromMetamist` fails with `DefaultCredentialsError`.
 - The small-variant VCF analysis type and stage are placeholders (`SMALL_VARIANT_VCF` in the generator).
-- Results aren't registered in Metamist (see [Reanalysis](#reanalysis)).
+- Registration hasn't been run against live Metamist yet.
