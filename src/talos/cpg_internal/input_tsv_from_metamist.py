@@ -87,6 +87,8 @@ class AnalysisQuery:
 # TODO: placeholder. The per-dataset, SG-ID-keyed VCF comes from an upcoming seqr-loader release, which will fix
 # the real analysis type and stage
 SMALL_VARIANT_VCF = AnalysisQuery(type='vcf', stage='TalosDatasetVcf')
+
+CNV_ANNOTATED_VCF = AnalysisQuery(type='single_dataset_cnv_annotated', by_sequencing_type=False)
 SV_ANNOTATED_VCF = AnalysisQuery(type='single_dataset_sv_annotated', by_sequencing_type=False)
 MITO_VCF = AnalysisQuery(type='vcf', stage='GenerateMitoJointCall')
 STR_VCF = AnalysisQuery(type='vcf', stage='MakeStripyJointCall')
@@ -452,6 +454,12 @@ def gather_cohort_inputs(
             build_seqr_map(pedigree, fetch_seqr_family_guids(cohort.project, sequencing_type)) if seqr_project else None
         )
 
+        sv_vcf = None
+        if sequencing_type == 'genome':
+            sv_vcf = find(SV_ANNOTATED_VCF)
+        elif sequencing_type == 'exome':
+            sv_vcf = find(CNV_ANNOTATED_VCF)
+
         gathered.append(
             CohortInputs(
                 cohort=cohort,
@@ -460,8 +468,7 @@ def gather_cohort_inputs(
                 seqr_map=seqr_map,
                 config=build_config(base_config, cohort.dataset, sequencing_type, seqr_project),
                 vcf=vcf or '',
-                # GATK-SV's annotated VCF is genome-only, exome gCNV isn't supported
-                sv_annotated=find(SV_ANNOTATED_VCF) if sequencing_type == 'genome' else None,
+                sv_annotated=sv_vcf,
                 mito=find(MITO_VCF),
                 str_vcf=find(STR_VCF),
                 history=find(HISTORY),
