@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Fixed
 
+  * Single-sample VCF inputs (`ss_vcf_dir`) are now split and left-aligned per sample before merging, instead of after (#729). When an allele was part of a multi-allelic record in one sample but a separate record in another, the merge split it across two rows, each with only some samples' genotypes. That produced false de novo calls and dropped alleles. Cohorts annotated from `ss_vcf_dir` before this fix keep the bad rows until their `${cohort}_annotated/` directory is deleted and they are re-annotated. A variant written twice within one sample's VCF is now also deduplicated
   * The default `errorStrategy` in `nextflow.config` read `process.maxRetries`, which is undefined when the closure runs. Every task failure threw instead of retrying. It now reads `task.maxRetries`, so failed tasks are retried up to 3 times with backoff
 
 ## Removed
