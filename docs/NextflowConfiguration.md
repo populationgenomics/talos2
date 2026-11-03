@@ -6,8 +6,7 @@ This README documents the parameters used in the nextflow configuration file. So
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `large_files`           | Directory containing large external resources (e.g. gnomAD, MANE, AlphaMissense). See [large_files README](https://github.com/populationgenomics/talos/blob/main/large_files/README.md) for instructions on how to source this content |
 | `processed_annotations` | Output directory for all processed/reformatted data. Cohort/callset independent, to be used across multiple runs.                                                                                                                      |
-| `outputDir`             | Defaults to `processed_annotations`, required for the 'workflow outputs' NextFlow functionality. Override for Annotation/Talos workflow using `-output-dir <path>`                                                                     |
-| `annotated_dir`         | Optional. Root directory to read previously annotated shards (and the shard manifest) from, as `<annotated_dir>/<cohort>_annotated` — annotation is skipped for cohorts whose manifest exists there. Defaults to the run's output directory. |
+| `outdir`                | Required by `main.nf`. Root for per-cohort outputs: `<outdir>/<cohort>_annotated` (annotation products, reused by later runs — annotation is skipped for cohorts whose manifest exists there) and `<outdir>/<cohort>_analysis_YYYYMMDD` (results). |
 | `input_vcf_extension`   | Linked to `shards`. If a sharded VCF is provided, this argument is the file extension to glob for. By default this is `vcf.bgz`, but could be altered to `vcf.gz`.                                                                     |
 | `alphamissense_tsv`     | Path in `large_files` to the AlphaMissense raw data, reformatted to be used in Hail annotation                                                                                                                                         |
 | `alphamissense_zip`     | Path in `processed_annotations` to the reformatted AlphaMissense data, ready to be used by Echtvar for annotation                                                                                                                      |
@@ -33,10 +32,24 @@ This README documents the parameters used in the nextflow configuration file. So
 | `container`             | Docker image to use                                                                                                                                                                                                                    |
 | `docker.enabled`        | Parameter for Nextflow to enable usage of Docker                                                                                                                                                                                       |
 
+## CPG entrypoint
+
+Only `cpg_main.nf` reads these, and there all but `metamist` and `metamist_wait_minutes` are required. `main.nf` ignores them. See
+[CPG Deployment](CpgDeployment.md).
+
+| **Parameter**     | **Description**                                                                                                                  |
+|-------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `cohort_ids`      | Metamist cohort IDs, as a list or a comma-delimited string                                                                       |
+| `access_level`    | `test`, `standard` or `full`. `test` publishes to `gs://cpg-<dataset>-test`, the others to `gs://cpg-<dataset>-main`            |
+| `sequencing_type` | `genome` or `exome`                                                                                                              |
+| `talos_config`    | The CPG `talos.toml`. Its `[cohorts.<dataset>]` sections are merged into each cohort's config                                    |
+| `metamist`        | Optional, default `false`. Register each cohort's results JSON (`aip-results`) and HTML report (`aip-report`) in Metamist      |
+| `metamist_wait_minutes` | Optional, default `30`. How long registration waits for each published file                                              |
+
 ## Structural Variant annotation
 
-These parameters are only used by the optional SV annotation workflow. They are ignored unless the input TSV
-declares an `sv` column, so an SNV-only run does not need any of the reference data below.
+These parameters are used by the SV annotation workflow. Its reference checks run for every run, so the
+`svafotate_bed`, `mane_gtf` and `svannotate_noncoding_bed` files must exist even if no cohort has an `sv` VCF.
 
 | **Parameter**              | **Description**                                                                                     |
 |----------------------------|-----------------------------------------------------------------------------------------------------|

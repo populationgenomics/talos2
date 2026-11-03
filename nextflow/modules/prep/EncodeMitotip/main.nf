@@ -1,5 +1,6 @@
 process EncodeMitotip {
     container params.container
+    publishDir params.processed_annotations, mode: 'copy'
 
     input:
         path tsv
