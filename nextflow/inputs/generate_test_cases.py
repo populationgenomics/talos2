@@ -1,6 +1,7 @@
 """
 Build the small-variant test cases: one trio VCF per case, each holding a single variant (or pair) of interest
-inside a body of real background variation.
+inside a body of real background variation. A `single_sample` case is written instead as one VCF per trio member
+(an `ss_vcf_dir` input), holding only that member's calls, to exercise the merge of single-sample VCFs.
 
 Background comes from a real trio in a real joint-call. Example data provided here (and a good model for future
 iterations) is a 1000G trio, meaning that there are no access issues with the resulting data.
@@ -122,6 +123,12 @@ mat_inherited = {'proband': HET_CALL, 'mother': HET_CALL, 'father': HOMREF_CALL}
 pat_inherited = {'proband': HET_CALL, 'mother': HOMREF_CALL, 'father': HET_CALL}
 # hemizygous proband (male pedigree) inheriting from a het mother; checks haploid GT parsing
 mat_inherited_hemi = {'proband': HEMI_VAR, 'mother': HET_CALL, 'father': HEMI_REF}
+# multi-allelic site (ALT 1 and 2), each parent passing on one of the proband's ALTs - both inherited, neither de novo
+split_inherited = {
+    'proband': Call('1/2', ad=[0, 15, 15]),
+    'mother': Call('0/2', ad=[15, 0, 15]),
+    'father': Call('0/1', ad=[15, 15, 0]),
+}
 
 
 @dataclass
@@ -182,6 +189,15 @@ class Case:
     anchors: list[int] = field(default_factory=list)
     # variants the report must contain for the proband, exactly. Empty = the case must report nothing
     expected: list[Expected] = field(default_factory=list)
+    # write one VCF per trio member (ss_vcf_dir input) instead of a trio VCF, exercising MergeVcfsWithBcftools
+    single_sample: bool = False
+
+    @property
+    def input_path(self) -> str:
+        """what the input TSV row points at: the trio VCF, or the directory of single-sample VCFs"""
+        if self.single_sample:
+            return f'nextflow/inputs/cases/{self.name}/single_sample_vcfs'
+        return f'nextflow/inputs/cases/{self.name}/{self.name}.vcf.bgz'
 
     def __post_init__(self):
         if not self.anchors:
@@ -324,6 +340,19 @@ CASES = [
         targets=[Variant('chr16', 89279566, 'CCTTCGGGG', 'C', tricky_de_novo)],
         expected=[Expected('chr16-89279566-CCTTCGGGG-C', 'ANKRD11', ['High Impact'])],
     ),
+    Case(
+        name='wdr74_single_sample_multiallelic',
+        description=(
+            'single-sample VCFs: proband 1/2 at a WDR74 multi-allelic site, each parent carrying one ALT. '
+            'Both alleles are inherited: T>C (ClinVar P/LP, paternal) is reported, T>G (maternal, no other category) '
+            'must not become a false de novo when the merge splits it from the mother (talos#729)'
+        ),
+        pedigree='female',
+        contig='chr11',
+        targets=[Variant('chr11', 62841775, 'T', 'C,G', split_inherited)],
+        expected=[Expected('chr11-62841775-T-C', 'WDR74', ['ClinVar P/LP'])],
+        single_sample=True,
+    ),
 ]
 
 
@@ -437,10 +466,42 @@ def write_input_tsv(cases: list[Case]) -> str:
     header = ['cohort', 'path', 'type', 'pedigree', 'config']
     lines = ['\t'.join(header)]
     for case in cases:
-        vcf = f'nextflow/inputs/cases/{case.name}/{case.name}.vcf.bgz'
-        lines.append('\t'.join([case.name, vcf, 'vcf', PEDIGREES[case.pedigree], 'nextflow/inputs/config.toml']))
+        input_type = 'ss_vcf_dir' if case.single_sample else 'vcf'
+        lines.append(
+            '\t'.join([case.name, case.input_path, input_type, PEDIGREES[case.pedigree], 'nextflow/inputs/config.toml'])
+        )
     (CASES_DIR / 'multi_case_input.tsv').write_text('\n'.join(lines) + '\n')
     return str(CASES_DIR / 'multi_case_input.tsv')
+
+
+def split_to_single_samples(trio_vcf: Path, out_dir: Path) -> None:
+    """
+    replace the trio VCF with one VCF per member, holding only that member's calls - what a single-sample
+    caller writes. -a trims ALTs the sample doesn't carry, so a trio multi-allelic row becomes a different
+    ALT list in each sample. -c 1 drops rows the sample doesn't carry at all
+    """
+    out_dir.mkdir(exist_ok=True)
+    for sample in SAMPLES:
+        subprocess.run(  # noqa: S603
+            [  # noqa: S607
+                'bcftools',
+                'view',
+                '--no-version',
+                '-s',
+                sample,
+                '-a',
+                '-c',
+                '1',
+                '-Oz',
+                '-W=tbi',
+                '-o',
+                str(out_dir / f'{sample}.vcf.bgz'),
+                str(trio_vcf),
+            ],
+            check=True,
+        )
+    trio_vcf.unlink()
+    trio_vcf.with_name(f'{trio_vcf.name}.tbi').unlink()
 
 
 def build_case(case: Case) -> None:
@@ -458,6 +519,8 @@ def build_case(case: Case) -> None:
     case_dir = CASES_DIR / case.name
     case_dir.mkdir(parents=True, exist_ok=True)
     bgzip_and_tabix(render(case.contig, [*background, *case.targets]), case_dir / case.name)
+    if case.single_sample:
+        split_to_single_samples(case_dir / f'{case.name}.vcf.bgz', Path(case.input_path))
     write_expected(case, case_dir, len(background))
     print(f'  wrote {len(background)} background + {len(case.targets)} injected rows')
 
