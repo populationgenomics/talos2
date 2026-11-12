@@ -64,7 +64,7 @@ sv = [
     'svafotate-cpg@git+https://github.com/MattWellie/svafotate#egg=main'
 ]
 cpg = [
-    'metamist>=7.14.3',
+    'metamist>=8',
 ]
 
 [project.urls]
