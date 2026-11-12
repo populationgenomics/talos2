@@ -84,9 +84,7 @@ class AnalysisQuery:
         return f'"{self.type}" analysis' + (f' from {self.stage}' if self.stage else '')
 
 
-# TODO: placeholder. The per-dataset, SG-ID-keyed VCF comes from an upcoming seqr-loader release, which will fix
-# the real analysis type and stage
-SMALL_VARIANT_VCF = AnalysisQuery(type='vcf', stage='TalosDatasetVcf')
+SMALL_VARIANT_VCF = AnalysisQuery(type='dataset_vcf')
 
 CNV_ANNOTATED_VCF = AnalysisQuery(type='single_dataset_cnv_annotated', by_sequencing_type=False)
 SV_ANNOTATED_VCF = AnalysisQuery(type='single_dataset_sv_annotated', by_sequencing_type=False)
