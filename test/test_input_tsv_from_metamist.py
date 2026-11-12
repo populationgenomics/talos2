@@ -336,9 +336,9 @@ def test_gather_cohort_inputs_reports_every_missing_input(fake_metamist, monkeyp
     assert str(error.value).splitlines() == [
         'Missing required inputs:',
         'COH0001: no pedigree entry for SGMOTHER (participant MOTHER)',
-        'COH0001: no "vcf" analysis from TalosDatasetVcf for genome in alpha-test',
+        'COH0001: no "dataset_vcf" analysis for genome in alpha-test',
         'COH0002: no pedigree entry for SGSINGLETON (participant SINGLETON)',
-        'COH0002: no "vcf" analysis from TalosDatasetVcf for genome in beta-test',
+        'COH0002: no "dataset_vcf" analysis for genome in beta-test',
     ]
 
 
@@ -350,7 +350,7 @@ def test_write_cohort_inputs(tmp_path):
     assert row == {
         'cohort': 'COH0001',
         'path': 'gs://cpg-alpha-test/alpha.vcf.bgz',
-        'type': 'vcf',
+        'type': 'dataset_vcf',
         'pedigree': f'{tmp_path}/COH0001_pedigree.ped',
         'config': f'{tmp_path}/COH0001_config.toml',
         'history': 'gs://cpg-alpha-test/history.json',
@@ -385,7 +385,7 @@ def test_main_writes_nothing_on_failure(fake_metamist, tmp_path, monkeypatch):
     written: list[str] = []
     monkeypatch.setattr(itm, 'write_cohort_inputs', lambda _inputs, inputs_dir: written.append(inputs_dir))
 
-    with pytest.raises(itm.MetamistInputError, match='COH0002: no "vcf" analysis'):
+    with pytest.raises(itm.MetamistInputError, match='COH0002: no "dataset_vcf" analysis'):
         itm.main(
             ['COH0001', 'COH0002'], 'test', 'genome', str(FIXTURES / 'talos.toml'), '20261030', str(tmp_path / 'o')
         )
