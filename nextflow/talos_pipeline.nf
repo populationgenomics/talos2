@@ -19,7 +19,8 @@ workflow TALOS_PIPELINE {
 	take:
 		// one Map per cohort: every input TSV column (cohort, path, type, pedigree, config, and the optional
 		// history, ext_ids, seqr_map, mito, sv, sv_annotated, str), plus annotated_dir and analysis_dir - the
-		// String URIs this cohort's annotation products and analysis results are published to
+		// String URIs this cohort's annotation products and analysis results are published to - and optionally
+		// report_dir, where the HTML report is published (default: analysis_dir)
 		ch_cohorts_raw
 
 	main:
@@ -69,6 +70,9 @@ workflow TALOS_PIPELINE {
 		row.analysis_dir,
 	) }
 
+	// where each cohort's HTML report is published, as [cohort, report_dir]
+	ch_report_dirs = ch_cohorts.map { row -> tuple(row.cohort, row.report_dir ?: row.analysis_dir) }
+
 	// SV annotation is wired up for every cohort, and decided per row: a cohort with no `sv` VCF carries [],
 	// and drops out in SV_ANNOTATION's no_sv branch. The SV reference data is therefore always required
 	ch_sv_inputs = ch_cohorts.map { row -> tuple(
@@ -108,12 +112,13 @@ workflow TALOS_PIPELINE {
 		ch_talos_meta,
 		ANNOTATION.out.shards,
 		SV_ANNOTATION.out.annotated.mix(ch_sv_preannotated),
+		ch_report_dirs,
 	)
 
 	emit:
 		// one entry per cohort: [cohort, results_json], the task-local results JSON - its published copy is
 		// <analysis_dir>/<name>
 		json = TALOS.out.json
-		// one entry per cohort: [cohort, report_html], likewise published to <analysis_dir>/<name>
+		// one entry per cohort: [cohort, report_html], published to <report_dir>/<name>
 		html = TALOS.out.html
 }

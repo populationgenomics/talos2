@@ -24,6 +24,8 @@ workflow TALOS {
 		// one entry per annotated shard: [cohort, vcf]
 		ch_shards
 		ch_sv_annotated
+		// one entry per cohort: [cohort, report_dir], where the HTML report is published
+		ch_report_dirs
 
     main:
     // existence of these files is necessary for starting the workflow
@@ -210,8 +212,9 @@ workflow TALOS {
     ch_create_html_inputs = HPOFlagging.out
         .join(UnifiedPanelAppParser.out)
         .join(ch_meta)
-        .map { cohort, result_json, panelapp_data, _pedigree, config, _history, ext, seqr, _mito, _str, analysis_dir ->
-            tuple(cohort, result_json, panelapp_data, config, ext, seqr, analysis_dir)
+        .join(ch_report_dirs)
+        .map { cohort, result_json, panelapp_data, _pedigree, config, _history, ext, seqr, _mito, _str, _analysis_dir, report_dir ->
+            tuple(cohort, result_json, panelapp_data, config, ext, seqr, report_dir)
         }
 
     CreateTalosHTML(
