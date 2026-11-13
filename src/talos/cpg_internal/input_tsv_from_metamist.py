@@ -496,7 +496,7 @@ def write_cohort_inputs(inputs: CohortInputs, inputs_dir: str) -> dict[str, str]
     row = {
         'cohort': cohort_id,
         'path': inputs.vcf,
-        'type': 'dataset_vcf',
+        'type': 'vcf',
         'pedigree': pedigree,
         'config': config,
         'history': inputs.history or '',
