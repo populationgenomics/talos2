@@ -14,7 +14,7 @@ process ConcatLabelledVcfs {
         tuple val(cohort), path("${cohort}_small_variants_labelled.vcf.bgz"), path("${cohort}_small_variants_labelled.vcf.bgz.tbi")
 
     script:
-        def vcf_list = (vcfs instanceof Collection ? vcfs.sort{ vcf-> vcf.name } : [vcfs]).join(' ')
+        def vcf_list = (vcfs instanceof Collection ? vcfs.sort{ vcf -> vcf.name } : [vcfs]).join(' ')
         """
         set -euo pipefail
 
