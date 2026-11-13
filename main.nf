@@ -100,8 +100,8 @@ workflow {
 	// root of the output directory. The paths are the published destinations, which don't exist until
 	// the run completes, so this is a proposal to be reviewed, not an output consumed by anything in this run
 	TALOS_PIPELINE.out.json
-		.map { cohort, results_json -> tuple(cohort, "${analysisDir(cohort)}/${results_json.name}".toString()) }
+		.map { row, published -> tuple(row.cohort, published) }
 		.collect(flat: false)
-		.map { pairs -> nextInputTsv(file(params.input_tsv), pairs.collectEntries { pair -> pair }) }
+		.map { pairs -> nextInputTsv(file(params.input_tsv), pairs.collectEntries()) }
 		.collectFile(name: "talos_input_${runDate()}.tsv", storeDir: file(outRoot()))
 }

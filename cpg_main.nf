@@ -68,15 +68,9 @@ def metamistProject(dataset) {
     params.access_level == 'test' ? "${dataset}-test".toString() : dataset
 }
 
-// [cohort, project, published URI, meta] for RegisterAnalysis, from a TALOS_PIPELINE emission joined to its cohort
-// row. publishedDir is the directory that emission was published to
-def registration(row, published, publishedDir) {
-    tuple(
-        row.cohort,
-        metamistProject(row.cpg_dataset),
-        "${publishedDir}/${published.name}".toString(),
-        [sequencing_type: params.sequencing_type],
-    )
+// [cohort, project, published URI, meta] for RegisterAnalysis, from a TALOS_PIPELINE [row, published URI] emission
+def registration(row, published) {
+    tuple(row.cohort, metamistProject(row.cpg_dataset), published, [sequencing_type: params.sequencing_type])
 }
 
 
@@ -124,16 +118,14 @@ workflow {
 	// register each cohort's published results JSON (aip-results, the next run's history) and HTML report
 	// (aip-report) against its Metamist cohort. Each waits for its own file to be published, independently
 	if (params.metamist) {
-		ch_rows = ch_cohorts.map { row -> tuple(row.cohort, row) }
-
 		RegisterResults(
-			TALOS_PIPELINE.out.json.join(ch_rows).map { _cohort, json, row -> registration(row, json, row.analysis_dir) },
+			TALOS_PIPELINE.out.json.map { row, published -> registration(row, published) },
 			'aip-results',
 			params.metamist_wait_minutes,
 		)
 
 		RegisterReport(
-			TALOS_PIPELINE.out.html.join(ch_rows).map { _cohort, html, row -> registration(row, html, row.report_dir) },
+			TALOS_PIPELINE.out.html.map { row, published -> registration(row, published) },
 			'aip-report',
 			params.metamist_wait_minutes,
 		)
