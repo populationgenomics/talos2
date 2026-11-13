@@ -106,14 +106,15 @@ or thin invocations of talos modules using `python -m talos.MODULE`. Most module
 builds those rows from `--input_tsv`; reanalysis cycles just re-run it. Annotation
 products publish to `${outdir}/${cohort}_annotated/`, analysis results to `${outdir}/${cohort}_analysis_YYYYMMDD/`.
 Publishing is process `publishDir`, never workflow outputs (`docs/adr/0001`): the entrypoint computes each
-cohort's `annotated_dir`/`analysis_dir` and carries them in the cohort rows (`ch_meta` ends with
-`analysis_dir`); `TALOS_PIPELINE`, subworkflows and modules never build output paths themselves.
+cohort's `annotated_dir`/`analysis_dir` and carries them in the cohort rows (`meta.analysis_dir`); `TALOS_PIPELINE`, subworkflows and modules never build output paths themselves.
 
 ### Channel shape in talos.nf
 
 Two spines, deliberately distinct — get this wrong and processes silently stall:
 
-- `ch_meta` — **one row per cohort**: `[cohort, pedigree, config, history, ext_ids, seqr_map, mito, str, analysis_dir]`
+- `ch_meta` — **one row per cohort**: `[cohort, meta]`, `meta` being the cohort row Map from `TALOS_PIPELINE` (file
+  columns already resolved to Paths or `[]`, plus `analysis_dir`, `report_dir`, `has_sv`). Read fields by name
+  (`meta.pedigree`); `ch_ctx = UnifiedPanelAppParser.out.join(ch_meta)` → `[cohort, panelapp, meta]` feeds most stages
 - `ch_shards` — **one row per annotated shard**: `[cohort, vcf]`
 
 Fanning per-cohort metadata across shards uses `combine(..., by: 0)`, never `join` (a join matches
@@ -121,7 +122,8 @@ one shard and strands the rest). Absent optional inputs are represented by an em
 empty/absent TSV cell parses to `''`/`null`, both falsy), which stages nothing; channel logic and
 module scripts branch on plain truthiness. `join(..., remainder: true)` is avoided on purpose — see the comment above
 `ch_sv_resolved`; it emitted a bare String key when the right-hand channel never emitted, silently
-emptying every downstream join.
+emptying every downstream join. Instead, cohorts without SV/mito data get `[cohort, []]` mixed in directly
+(`meta.has_sv` / `meta.mito`).
 
 ### The three variant streams
 

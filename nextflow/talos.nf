@@ -18,14 +18,15 @@ workflow TALOS {
 		ch_mane
 		ch_gff
 		ch_ref_genome
-		// one entry per cohort: [cohort, pedigree, config, history, ext_ids, seqr_map, mito, str, analysis_dir]
-		// analysis_dir is where this cohort's analysis results are published
+		// one entry per cohort: [cohort, meta], meta being the cohort's row Map as built by TALOS_PIPELINE - pedigree
+		// and config are Paths, the optional history, ext_ids, seqr_map, mito and str are a Path or [], and
+		// analysis_dir/report_dir are where its results and HTML report are published. has_sv says whether an
+		// entry for this cohort will arrive on ch_sv_annotated
 		ch_meta
 		// one entry per annotated shard: [cohort, vcf]
 		ch_shards
+		// one entry per cohort with SV data: [cohort, vcf, tbi]
 		ch_sv_annotated
-		// one entry per cohort: [cohort, report_dir], where the HTML report is published
-		ch_report_dirs
 
     main:
     // existence of these files is necessary for starting the workflow
@@ -69,26 +70,23 @@ workflow TALOS {
     ch_first_shards = ch_shards
         .unique { it -> it[0] }
         .join(ch_meta)
-        .map { cohort, vcf, pedigree, config, _history, _ext, _seqr, _mito, _str, _analysis_dir ->
-            tuple(cohort, vcf, pedigree, config)
-        }
+        .map { cohort, vcf, meta -> tuple(cohort, vcf, meta.pedigree, meta.config) }
 
     StartupChecks(
         ch_first_shards,
     )
 
-    // UnifiedPanelAppParser
-    ch_panel_app_inputs = StartupChecks.out
-        .join(ch_meta)
-        .map { cohort, check_file, pedigree, config, _history, _ext, _seqr, _mito, _str, analysis_dir ->
-            tuple(cohort, check_file, config, pedigree, analysis_dir)
-        }
-
     UnifiedPanelAppParser(
-        ch_panel_app_inputs,
+        StartupChecks.out
+            .join(ch_meta)
+            .map { cohort, check_file, meta -> tuple(cohort, check_file, meta.config, meta.pedigree, meta.analysis_dir) },
     	ch_panelapp,
     	ch_hpo_file,
     )
+
+    // [cohort, panelapp_data, meta] - the per-cohort context every downstream stage draws from. Waiting on
+    // UnifiedPanelAppParser also means waiting on StartupChecks, which feeds it
+    ch_ctx = UnifiedPanelAppParser.out.join(ch_meta)
 
     // apply this run's ClinVar to every shard, then filter and label each one independently
     AnnotateVcfWithFreshClinvar(
@@ -96,129 +94,92 @@ workflow TALOS {
         ch_clinvar_zip,
     )
 
-    // combine (not join) - the per-cohort metadata is repeated across every shard of that cohort
-    ch_streaming_inputs = AnnotateVcfWithFreshClinvar.out
-        .combine(UnifiedPanelAppParser.out, by: 0)
-        .combine(ch_meta, by: 0)
-        .map { cohort, vcf, panelapp_data, pedigree, config, _history, _ext, _seqr, _mito, _str, _analysis_dir ->
-            tuple(cohort, vcf, panelapp_data, pedigree, config)
-        }
-
+    // combine (not join) - the per-cohort context is repeated across every shard of that cohort
     RunSmallFiltering(
-        ch_streaming_inputs,
+        AnnotateVcfWithFreshClinvar.out
+            .combine(ch_ctx, by: 0)
+            .map { cohort, vcf, panelapp_data, meta -> tuple(cohort, vcf, panelapp_data, meta.pedigree, meta.config) },
         ch_mane,
         ch_clinvar_pm5,
     )
 
-    // where each cohort's analysis results are published, as [cohort, analysis_dir]
-    ch_analysis_dirs = ch_meta.map { row -> tuple(row[0], row[8]) }
-
     // gather the labelled shards back to one VCF per cohort
     ConcatLabelledVcfs(
-        RunSmallFiltering.out.groupTuple(by: 0).join(ch_analysis_dirs),
+        RunSmallFiltering.out
+            .groupTuple(by: 0)
+            .join(ch_meta)
+            .map { cohort, vcfs, indexes, meta -> tuple(cohort, vcfs, indexes, meta.analysis_dir) },
     )
 
     // filter & label any annotated SV VCFs. ch_sv_annotated only carries cohorts that had SV data, so this
     // inner join naturally restricts the process to those cohorts
-    ch_run_hail_sv_inputs = ch_sv_annotated
-        .join(UnifiedPanelAppParser.out)
-        .join(ch_meta)
-        .map { cohort, sv_vcf, sv_idx, panelapp_data, pedigree, config, _history, _ext, _seqr, _mito, _str, analysis_dir ->
-            tuple(cohort, sv_vcf, sv_idx, panelapp_data, pedigree, config, analysis_dir)
-        }
-
     RunSvFiltering(
-        ch_run_hail_sv_inputs,
+        ch_sv_annotated
+            .join(ch_ctx)
+            .map { cohort, sv_vcf, sv_idx, panelapp_data, meta ->
+                tuple(cohort, sv_vcf, sv_idx, panelapp_data, meta.pedigree, meta.config, meta.analysis_dir)
+            },
         ch_mane,
     )
 
-    // re-attach an empty placeholder for every cohort without SV data, so ValidateMOI runs for all cohorts.
-    // Deliberately not `join(..., remainder: true)`: the shape of a remainder emission depends on
-    // Nextflow inferring the right-hand channel's arity, which it cannot do when that channel never
-    // emits (no cohort had SV data). It then emits the bare cohort key instead of [cohort, null], and
-    // indexing that String yields its first character, silently emptying every downstream join.
-    // Offering [] for every cohort and letting a real SV VCF displace it has one fixed shape
-    ch_sv_placeholder = ch_meta.map { row -> tuple(row[0], []) }
-
+    // one entry per cohort: the filtered SV VCF, or [] for a cohort with no SV data. Which cohorts have SVs is
+    // known up front (meta.has_sv), so the rest are given [] directly and never wait on RunSvFiltering.
+    // Deliberately not `join(..., remainder: true)`: when the right-hand channel never emits, Nextflow cannot
+    // infer its arity and emits the bare cohort key instead of [cohort, null], silently emptying every downstream join
     ch_sv_resolved = RunSvFiltering.out
         .map { cohort, sv_vcf, _sv_idx -> tuple(cohort, sv_vcf) }
-        .mix(ch_sv_placeholder)
-        .groupTuple(by: 0)
-        .map { cohort, sv_vcfs -> tuple(cohort, sv_vcfs.find { it -> it } ?: []) }
+        .mix(ch_meta.filter { row -> !row[1].has_sv }.map { row -> tuple(row[0], []) })
 
-    // surprise! It's Mito data!
-    ch_mito_joined = ch_meta
-        .join(UnifiedPanelAppParser.out)
-        .join(StartupChecks.out)
-        .map { cohort, pedigree, config, _history, _ext, _seqr, mito, _str, _analysis_dir, panelapp_data, _check_file ->
-          tuple(cohort, mito, panelapp_data, pedigree, config)
-    }
-
-    // absent mito data is [] (falsy), a real VCF is a truthy Path
-    ch_mito_branched = ch_mito_joined.branch { row ->
-        real:  row[1]
-        empty: true
-    }
-
-    ch_mito_for_annotation = ch_mito_branched.real
-        .map { cohort, mito, panelapp, ped, config ->
-            tuple(cohort, mito, panelapp, ped, config,
-                  file(params.mitimpact_zip, checkIfExists: true),
-                  file(params.mitotip_zip, checkIfExists: true),
-                  file(params.napogee_zip, checkIfExists: true))
-        }
-
+    // surprise! It's Mito data! Same shape as the SV stream: annotated for cohorts that have it, [] for the rest
     AnnotateMitoVcf(
-        ch_mito_for_annotation,
+        ch_ctx
+            .filter { row -> row[2].mito }
+            .map { cohort, panelapp_data, meta ->
+                tuple(cohort, meta.mito, panelapp_data, meta.pedigree, meta.config,
+                      file(params.mitimpact_zip, checkIfExists: true),
+                      file(params.mitotip_zip, checkIfExists: true),
+                      file(params.napogee_zip, checkIfExists: true))
+            },
         ch_ref_genome,
         ch_gff,
         ch_clinvar_zip,
     )
 
     ch_mito_resolved = AnnotateMitoVcf.out
-        .mix(ch_mito_branched.empty.map { cohort, mito, _pa, _ped, _cfg -> tuple(cohort, mito) })
+        .mix(ch_meta.filter { row -> !row[1].mito }.map { row -> tuple(row[0], []) })
 
     // Validate MOI of all variants
-    ch_validate_moi_inputs = ConcatLabelledVcfs.out
-        .join(UnifiedPanelAppParser.out)
-        .join(ch_meta)
-        .join(ch_mito_resolved)
-        .join(ch_sv_resolved)
-        .map { cohort, labelled_vcf, labelled_vcf_index, panelapp_out, pedigree, config, history, _ext, _seqr, _mito, str_vcf, _analysis_dir, anno_mito, anno_sv ->
-            tuple(cohort, labelled_vcf, labelled_vcf_index, anno_sv, anno_mito, str_vcf, panelapp_out, pedigree, config, history)
-        }
-
     ValidateMOI(
-        ch_validate_moi_inputs,
+        ConcatLabelledVcfs.out
+            .join(ch_ctx)
+            .join(ch_mito_resolved)
+            .join(ch_sv_resolved)
+            .map { cohort, labelled_vcf, labelled_vcf_index, panelapp_data, meta, anno_mito, anno_sv ->
+                tuple(cohort, labelled_vcf, labelled_vcf_index, anno_sv, anno_mito, meta.str, panelapp_data,
+                      meta.pedigree, meta.config, meta.history)
+            },
         timestamp,
     )
 
     // Flag any relevant HPO terms
-    ch_hpo_inputs = ValidateMOI.out
-        .join(UnifiedPanelAppParser.out)
-        .join(ch_meta)
-        .map { cohort, talos_result_json, panelapp_data, _pedigree, config, _history, _ext, _seqr, _mito, _str, analysis_dir ->
-            tuple(cohort, talos_result_json, panelapp_data, config, analysis_dir)
-        }
-
     HPOFlagging(
-        ch_hpo_inputs,
+        ValidateMOI.out
+            .join(ch_ctx)
+            .map { cohort, talos_result_json, panelapp_data, meta ->
+                tuple(cohort, talos_result_json, panelapp_data, meta.config, meta.analysis_dir)
+            },
         ch_gen2phen,
         ch_phenio,
         timestamp,
     )
 
     // Generate HTML report
-    ch_create_html_inputs = HPOFlagging.out
-        .join(UnifiedPanelAppParser.out)
-        .join(ch_meta)
-        .join(ch_report_dirs)
-        .map { cohort, result_json, panelapp_data, _pedigree, config, _history, ext, seqr, _mito, _str, _analysis_dir, report_dir ->
-            tuple(cohort, result_json, panelapp_data, config, ext, seqr, report_dir)
-        }
-
     CreateTalosHTML(
-        ch_create_html_inputs,
+        HPOFlagging.out
+            .join(ch_ctx)
+            .map { cohort, result_json, panelapp_data, meta ->
+                tuple(cohort, result_json, panelapp_data, meta.config, meta.ext_ids, meta.seqr_map, meta.report_dir)
+            },
         timestamp,
     )
 

@@ -14,6 +14,10 @@ include { ANNOTATION } from './annotation'
 include { SV_ANNOTATION } from './sv_annotation'
 include { TALOS } from './talos'
 
+// an optional input column: the checked file, or [] when the cell is empty/absent
+def optFile(path) {
+	path ? file(path, checkIfExists: true) : []
+}
 
 workflow TALOS_PIPELINE {
 	take:
@@ -40,48 +44,36 @@ workflow TALOS_PIPELINE {
 
 	// `sv` is a raw joint-call to annotate, `sv_annotated` an already annotated one (e.g. GATK-SV output) that
 	// skips SV_ANNOTATION. Both on one row is ambiguous - which one should be analysed?
+	// Every file column is resolved (and checked) once here; the channels below are plain projections of this row.
+	// Optional columns become [] when absent, which stages nothing and is falsy in every downstream truthiness check
 	ch_cohorts = ch_cohorts_raw.map { row ->
 		if (row.sv && row.sv_annotated) {
 			error("Cohort ${row.cohort} sets both `sv` (${row.sv}) and `sv_annotated` (${row.sv_annotated}), supply one or the other")
 		}
-		row
+		row + [
+			pedigree: file(row.pedigree, checkIfExists: true),
+			config: file(row.config, checkIfExists: true),
+			history: optFile(row.history),
+			ext_ids: optFile(row.ext_ids),
+			seqr_map: optFile(row.seqr_map),
+			mito: optFile(row.mito),
+			sv: optFile(row.sv),
+			// STR VCFs (from stripy_json_to_vcf) need no annotation, they go straight to ValidateMOI
+			str: optFile(row.str),
+			report_dir: row.report_dir ?: row.analysis_dir,
+			// whether TALOS should wait for a filtered SV VCF for this cohort
+			has_sv: (row.sv || row.sv_annotated) as boolean,
+		]
 	}
 
-	ch_inputs = ch_cohorts.map { row -> tuple(
-		row.cohort,
-		row.path,
-		row.type,
-		file(row.pedigree, checkIfExists: true),
-		row.annotated_dir,
-	) }
+	ch_inputs = ch_cohorts.map { row -> tuple(row.cohort, row.path, row.type, row.pedigree, row.annotated_dir) }
 
-	// per-cohort metadata, one row per cohort - the annotated shards are carried separately
-	ch_talos_meta = ch_cohorts.map { row -> tuple(
-		row.cohort,
-		file(row.pedigree, checkIfExists: true),
-		file(row.config, checkIfExists: true),
-		// optional columns - an empty/absent cell becomes [], which stages nothing and is falsy in every downstream truthiness check
-		row.history ? file(row.history, checkIfExists: true) : [],
-		row.ext_ids ? file(row.ext_ids, checkIfExists: true) : [],
-		row.seqr_map ? file(row.seqr_map, checkIfExists: true) : [],
-		row.mito ? file(row.mito, checkIfExists: true) : [],
-		// STR VCFs (from stripy_json_to_vcf) need no annotation, they go straight to ValidateMOI
-		row.str ? file(row.str, checkIfExists: true) : [],
-		row.analysis_dir,
-	) }
-
-	// where each cohort's HTML report is published, as [cohort, report_dir]
-	ch_report_dirs = ch_cohorts.map { row -> tuple(row.cohort, row.report_dir ?: row.analysis_dir) }
+	// per-cohort metadata, one row per cohort as [cohort, row] - the annotated shards are carried separately
+	ch_talos_meta = ch_cohorts.map { row -> tuple(row.cohort, row) }
 
 	// SV annotation is wired up for every cohort, and decided per row: a cohort with no `sv` VCF carries [],
 	// and drops out in SV_ANNOTATION's no_sv branch. The SV reference data is therefore always required
-	ch_sv_inputs = ch_cohorts.map { row -> tuple(
-		row.cohort,
-		row.sv ? file(row.sv, checkIfExists: true) : [],
-		file(row.config, checkIfExists: true),
-		file(row.pedigree, checkIfExists: true),
-		row.annotated_dir,
-	) }
+	ch_sv_inputs = ch_cohorts.map { row -> tuple(row.cohort, row.sv, row.config, row.pedigree, row.annotated_dir) }
 
 	SV_ANNOTATION(
 		ch_ref_genome,
@@ -112,13 +104,16 @@ workflow TALOS_PIPELINE {
 		ch_talos_meta,
 		ANNOTATION.out.shards,
 		SV_ANNOTATION.out.annotated.mix(ch_sv_preannotated),
-		ch_report_dirs,
 	)
 
 	emit:
-		// one entry per cohort: [cohort, results_json], the task-local results JSON - its published copy is
-		// <analysis_dir>/<name>
+		// one entry per cohort: [row, published_uri] - the cohort row Map (as resolved above), and the String URI
+		// its results JSON / HTML report is published to. The published copy doesn't exist until publishDir has
+		// finished copying it, so a consumer that reads it must wait for it
 		json = TALOS.out.json
-		// one entry per cohort: [cohort, report_html], published to <report_dir>/<name>
+			.join(ch_talos_meta)
+			.map { _cohort, results_json, row -> tuple(row, "${row.analysis_dir}/${results_json.name}".toString()) }
 		html = TALOS.out.html
+			.join(ch_talos_meta)
+			.map { _cohort, report_html, row -> tuple(row, "${row.report_dir}/${report_html.name}".toString()) }
 }
