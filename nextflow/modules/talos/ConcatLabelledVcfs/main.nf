@@ -1,5 +1,6 @@
 process ConcatLabelledVcfs {
     container params.container
+    publishDir { analysis_dir }, mode: 'copy'
 
     // gather the labelled shards back into the single per-cohort VCF ValidateMOI expects.
     // each shard is coordinate-sorted internally, but shard names don't sort genomically
@@ -7,7 +8,7 @@ process ConcatLabelledVcfs {
     // whoever made them), so the concatenated stream is re-sorted rather than trusted
     input:
         // indexes aren't named in the script, but staging them is what lets `concat -a` work
-        tuple val(cohort), path(vcfs), path(indexes)
+        tuple val(cohort), path(vcfs), path(indexes), val(analysis_dir)
 
     output:
         tuple val(cohort), path("${cohort}_small_variants_labelled.vcf.bgz"), path("${cohort}_small_variants_labelled.vcf.bgz.tbi")

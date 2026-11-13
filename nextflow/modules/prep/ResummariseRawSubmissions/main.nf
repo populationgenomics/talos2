@@ -1,5 +1,7 @@
 process ResummariseRawSubmissions {
     container params.container
+    // the pathogenic-only VCF is an intermediate for the PM5 codon map, only the "all" VCF and the TSV are kept
+    publishDir params.processed_annotations, mode: 'copy', pattern: '*{.all.vcf.bgz,.all.vcf.bgz.tbi,.tsv}'
 
     input:
         path variant_summary

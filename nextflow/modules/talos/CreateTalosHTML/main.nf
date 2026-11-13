@@ -1,8 +1,9 @@
 process CreateTalosHTML {
     container params.container
+    publishDir { report_dir }, mode: 'copy'
 
     input:
-        tuple val(cohort), path(talos_result_json), path(panelapp_data), path(talos_config), path(ext_ids), path(seqr_ids)
+        tuple val(cohort), path(talos_result_json), path(panelapp_data), path(talos_config), path(ext_ids), path(seqr_ids), val(report_dir)
         val timestamp
 
     output:

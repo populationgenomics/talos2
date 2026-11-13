@@ -12,3 +12,4 @@ il2rg_hemizygous_maternal	nextflow/inputs/cases/il2rg_hemizygous_maternal/il2rg_
 rnu4_2_de_novo_clinvar	nextflow/inputs/cases/rnu4_2_de_novo_clinvar/rnu4_2_de_novo_clinvar.vcf.bgz	vcf	nextflow/inputs/pedigree_female_proband.ped	nextflow/inputs/config.toml
 hspa8_not_on_panel	nextflow/inputs/cases/hspa8_not_on_panel/hspa8_not_on_panel.vcf.bgz	vcf	nextflow/inputs/pedigree_male_proband.ped	nextflow/inputs/config.toml
 ankrd11_missing_parents	nextflow/inputs/cases/ankrd11_missing_parents/ankrd11_missing_parents.vcf.bgz	vcf	nextflow/inputs/pedigree_female_proband.ped	nextflow/inputs/config.toml
+wdr74_single_sample_multiallelic	nextflow/inputs/cases/wdr74_single_sample_multiallelic/single_sample_vcfs	ss_vcf_dir	nextflow/inputs/pedigree_female_proband.ped	nextflow/inputs/config.toml

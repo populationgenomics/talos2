@@ -79,6 +79,8 @@ nav:
       - SV Annotation Module: SvAnnotation.md
   - Contributing:
       - Adding New Categories: AddingNewCategories.md
+  - Internal:
+      - CPG Deployment: CpgDeployment.md
   - Changelog: changelog.md
 
 extra:

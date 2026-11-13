@@ -15,8 +15,8 @@ Instead of re-implementing the exact process here, I've split the annotation int
   - Consequence: handled using SVAnnotate, and exact replica of the GATK-SV process
   - Pop.Freq: handled using [SVAFotate](https://github.com/fakedrtom/SVAFotate)
 
-These two steps, and pre-processing of relevant input files, are engaged only if an SV file is included in the input
-TSV file, with the same core conceit as small variants and Mito data - a single joint-called VCF should contain the whole
+These two steps, and pre-processing of relevant input files, run for each cohort whose input TSV row has an `sv` VCF,
+with the same core conceit as small variants and Mito data - a single joint-called VCF should contain the whole
 group of Samples being processed, which should also match the Pedigree and Small-variant data.
 
 A separate sub-workflow, `SV_ANNOTATION` has been created to handle these steps. `SV_ANNOTATION` publishes an annotated
@@ -24,4 +24,22 @@ VCF per cohort, `RunSmallFilteringSv` filters and labels it with `CategoryBoolea
 into the report.
 
 To utilise this functionality, add a `sv` column to the input TSV, pointing to a SV joint-call. This has been tested on
-the output of GATK-SV (multiple variant callers, with resolved calls) and GATK's gCNV.
+the output of GATK-SV (multiple variant callers, with resolved calls) and GATK's gCNV. The decision is made per row:
+cohorts with an empty or absent `sv` cell skip SV annotation and filtering.
+
+## Pre-annotated SV VCFs
+
+If a cohort's SV VCF has already been annotated (e.g. the output of GATK-SV's own annotation stage), put it in the
+`sv_annotated` column instead of `sv`. It skips `SV_ANNOTATION` entirely and goes straight to `RunSvFiltering`.
+The VCF must:
+
+- be bgzipped, with a `.tbi` index alongside it (`<vcf>.tbi`)
+- carry SVAnnotate's consequence fields (`PREDICTED_LOF` etc.)
+- carry population frequencies as `<prefix>_sv_AF` and `<prefix>_sv_SVID`, where `<prefix>` is the cohort config's
+  `RunSvFiltering.gnomad_population`. These fields are not renamed, so set the config to match the VCF
+
+A row can set `sv` or `sv_annotated`, not both; the run fails before any task starts if one does.
+
+The SV reference data (`svafotate_bed`, `mane_gtf`, `svannotate_noncoding_bed`, all downloaded by
+`large_files/gather_files.sh`) is required for every run, whether or not any cohort has SV data. `ref_dict` is only
+generated when there is SV annotation to do.

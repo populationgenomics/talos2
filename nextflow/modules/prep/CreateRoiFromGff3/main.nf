@@ -1,5 +1,6 @@
 process CreateRoiFromGff3 {
     container params.container
+    publishDir params.processed_annotations, mode: 'copy'
 
     // this file is not downloaded at runtime - that presents issues for offline execution environments
     input:
