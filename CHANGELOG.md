@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * CPG only: `talos.cpg_internal.input_tsv_from_metamist` builds input TSV rows for Metamist cohorts, generating each cohort's pedigree, external ID map, seqr map and merged config. It needs the new `cpg` extra (`metamist`)
   * CPG only: `cpg_main.nf`, a second entrypoint over `TALOS_PIPELINE`. It takes Metamist cohort IDs (`--cohort_ids`, `--access_level`, `--sequencing_type`, `--talos_config`) instead of an input TSV, builds the cohort rows with `InputTsvFromMetamist`, and publishes each cohort to `gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/{annotated,analysis_YYYYMMDD}/`. See `docs/CpgDeployment.md`
   * CPG only: `cpg_main.nf --metamist` registers each cohort's published results JSON (`aip-results`, the next run's history) and HTML report (`aip-report`) in Metamist, against the Metamist cohort. Off by default
+  * `params.recalculate_ac_af_an` (default `true`). Set `false` to keep the INFO/AC, AF and AN already in the input VCF, e.g. from a larger callset, instead of recalculating them from the cohort's genotypes. Pedigree subsetting then leaves them alone too
 
 ## Changed
 
