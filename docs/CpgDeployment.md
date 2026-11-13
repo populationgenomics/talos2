@@ -41,8 +41,14 @@ Each cohort publishes under its dataset bucket:
 ```
 gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/
 ├── annotated/                 annotation products, reused by every later run
-└── analysis_YYYYMMDD/         this run's results, including the HTML report
+└── analysis_YYYYMMDD/         this run's results
     └── inputs/                the generated inputs, see below
+```
+
+The HTML report alone goes to the dataset's web bucket, under the same path:
+
+```
+gs://cpg-<dataset>-{main|test}-web/<sequencing_type>/talos/<cohort>/analysis_YYYYMMDD/<cohort>_report_<date>.html
 ```
 
 The date is fixed once, when the run starts. As with `main.nf`, a cohort whose `annotated/` manifest already
@@ -147,7 +153,7 @@ With `--metamist`, each cohort's published outputs are registered in Metamist, i
 | **Analysis type** | **Output**                                           |
 |-------------------|------------------------------------------------------|
 | `aip-results`     | `analysis_YYYYMMDD/<cohort>_full_results_<date>.json` |
-| `aip-report`      | `analysis_YYYYMMDD/<cohort>_report_<date>.html`       |
+| `aip-report`      | `analysis_YYYYMMDD/<cohort>_report_<date>.html`, in the `-web` bucket |
 
 These are the types Talos v1 registered. Each is a separate task (`RegisterResults`, `RegisterReport`), in the
 Talos container, running `cpg_utils.metamist_registration`. `publishDir` copies in the background, so each

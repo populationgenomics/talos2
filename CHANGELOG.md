@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * CPG only: `talos.cpg_internal.input_tsv_from_metamist` builds input TSV rows for Metamist cohorts, generating each cohort's pedigree, external ID map, seqr map and merged config. It needs the new `cpg` extra (`metamist`)
   * CPG only: `cpg_main.nf`, a second entrypoint over `TALOS_PIPELINE`. It takes Metamist cohort IDs (`--cohort_ids`, `--access_level`, `--sequencing_type`, `--talos_config`) instead of an input TSV, builds the cohort rows with `InputTsvFromMetamist`, and publishes each cohort to `gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/{annotated,analysis_YYYYMMDD}/`. See `docs/CpgDeployment.md`
   * CPG only: `cpg_main.nf --metamist` registers each cohort's published results JSON (`aip-results`, the next run's history) and HTML report (`aip-report`) in Metamist, against the Metamist cohort. Off by default
+  * `params.recalculate_ac_af_an` (default `true`). Set `false` to keep the INFO/AC, AF and AN already in the input VCF, e.g. from a larger callset, instead of recalculating them from the cohort's genotypes. Pedigree subsetting then leaves them alone too
 
 ## Changed
 
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Fixed
 
+  * Single-sample VCF inputs (`ss_vcf_dir`) are now split and left-aligned per sample before merging, instead of after (#729). When an allele was part of a multi-allelic record in one sample but a separate record in another, the merge split it across two rows, each with only some samples' genotypes. That produced false de novo calls and dropped alleles. Cohorts annotated from `ss_vcf_dir` before this fix keep the bad rows until their `${cohort}_annotated/` directory is deleted and they are re-annotated. A variant written twice within one sample's VCF is now also deduplicated
   * The default `errorStrategy` in `nextflow.config` read `process.maxRetries`, which is undefined when the closure runs. Every task failure threw instead of retrying. It now reads `task.maxRetries`, so failed tasks are retried up to 3 times with backoff
 
 ## Removed

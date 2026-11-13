@@ -11,6 +11,7 @@ nextflow.enable.dsl=2
 
         gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/annotated/
         gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/analysis_YYYYMMDD/
+        gs://cpg-<dataset>-{main|test}-web/<sequencing_type>/talos/<cohort>/analysis_YYYYMMDD/   (HTML report only)
 
     The first process, InputTsvFromMetamist, finds each cohort's inputs in Metamist and generates the rest
     (pedigree, external IDs, seqr map, per-cohort config) into that cohort's analysis_YYYYMMDD/inputs/. Its TSV
@@ -42,9 +43,10 @@ def cohortIds() {
     raw.collect { cohort_id -> cohort_id.toString().trim() }.findAll { cohort_id -> cohort_id }.unique()
 }
 
-// must agree with cohort_root() in talos.cpg_internal.input_tsv_from_metamist. Plain Strings, never a Path
-def cohortRoot(dataset, cohort) {
-    def bucket = "gs://cpg-${dataset}-${params.access_level == 'test' ? 'test' : 'main'}"
+// must agree with cohort_root() in talos.cpg_internal.input_tsv_from_metamist. Plain Strings, never a Path.
+// suffix selects a sibling bucket, e.g. '-web' for the HTML report
+def cohortRoot(dataset, cohort, suffix = '') {
+    def bucket = "gs://cpg-${dataset}-${params.access_level == 'test' ? 'test' : 'main'}${suffix}"
     "${bucket}/${params.sequencing_type}/talos/${cohort}".toString()
 }
 
@@ -56,19 +58,19 @@ def analysisDir(dataset, cohort) {
     "${cohortRoot(dataset, cohort)}/analysis_${runDate()}".toString()
 }
 
+// the HTML report goes to the dataset's -web bucket, mirroring analysisDir
+def reportDir(dataset, cohort) {
+    "${cohortRoot(dataset, cohort, '-web')}/analysis_${runDate()}".toString()
+}
+
 // the Metamist project a dataset's analyses are registered in
 def metamistProject(dataset) {
     params.access_level == 'test' ? "${dataset}-test".toString() : dataset
 }
 
-// [cohort, project, published URI, meta] for RegisterAnalysis, from a TALOS_PIPELINE emission joined to its cohort row
+// [cohort, project, published URI, meta] for RegisterAnalysis, from a TALOS_PIPELINE [row, published URI] emission
 def registration(row, published) {
-    tuple(
-        row.cohort,
-        metamistProject(row.cpg_dataset),
-        "${row.analysis_dir}/${published.name}".toString(),
-        [sequencing_type: params.sequencing_type],
-    )
+    tuple(row.cohort, metamistProject(row.cpg_dataset), published, [sequencing_type: params.sequencing_type])
 }
 
 
@@ -108,6 +110,7 @@ workflow {
 		.map { row -> row + [
 			annotated_dir: annotatedDir(row.cpg_dataset, row.cohort),
 			analysis_dir: analysisDir(row.cpg_dataset, row.cohort),
+			report_dir: reportDir(row.cpg_dataset, row.cohort),
 		] }
 
 	TALOS_PIPELINE(ch_cohorts)
@@ -115,16 +118,14 @@ workflow {
 	// register each cohort's published results JSON (aip-results, the next run's history) and HTML report
 	// (aip-report) against its Metamist cohort. Each waits for its own file to be published, independently
 	if (params.metamist) {
-		ch_rows = ch_cohorts.map { row -> tuple(row.cohort, row) }
-
 		RegisterResults(
-			TALOS_PIPELINE.out.json.join(ch_rows).map { _cohort, json, row -> registration(row, json) },
+			TALOS_PIPELINE.out.json.map { row, published -> registration(row, published) },
 			'aip-results',
 			params.metamist_wait_minutes,
 		)
 
 		RegisterReport(
-			TALOS_PIPELINE.out.html.join(ch_rows).map { _cohort, html, row -> registration(row, html) },
+			TALOS_PIPELINE.out.html.map { row, published -> registration(row, published) },
 			'aip-report',
 			params.metamist_wait_minutes,
 		)
