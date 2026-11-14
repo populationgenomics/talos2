@@ -1,7 +1,7 @@
 """
 Compare a Nextflow run over nextflow/inputs/test.tsv with each case's expected.json, printing PASS/FAIL per case.
 
-Input is the next-run TSV the run publishes to the root of its `-output-dir` (talos_input_YYYYMMDD.tsv). Each row
+Input is the next-run TSV the run publishes to the root of its `--outdir` (talos_input_YYYYMMDD.tsv). Each row
 names a cohort, its input VCF (`path`, with expected.json alongside it) and the results JSON that run produced
 for it (`history`). Cohorts with no expected.json next to their VCF are skipped.
 
@@ -67,7 +67,7 @@ def check_case(expected: dict, results_file: str) -> list[str]:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('next_run_tsv', type=Path, help='the talos_input_YYYYMMDD.tsv published to the -output-dir')
+    parser.add_argument('next_run_tsv', type=Path, help='the talos_input_YYYYMMDD.tsv published to the --outdir')
     args = parser.parse_args()
 
     with args.next_run_tsv.open() as handle:

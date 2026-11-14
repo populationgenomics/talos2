@@ -17,6 +17,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--changelog-start-->
 <!--latest-start-->
 
+[13.0.0]
+
+## Added
+
+  * Optional `sv_annotated` input TSV column: an already annotated SV VCF (e.g. GATK-SV output) which bypasses SV annotation and goes straight to SV filtering. Setting both `sv` and `sv_annotated` on one row is an error
+  * Small-variant and `sv` VCFs are subset to the pedigree's samples during annotation, dropping variants no pedigree sample carries, so a dataset-wide callset is annotated and stored at cohort size. VCFs already matching the pedigree are unchanged. Pedigree samples missing from a VCF are a warning, no shared samples an error. See `docs/Pedigree.md`
+  * `params.recalculate_ac_af_an` (default `true`). Set `false` to keep the INFO/AC, AF and AN already in the input VCF, e.g. from a larger callset, instead of recalculating them from the cohort's genotypes. Pedigree subsetting then leaves them alone too
+
+## CPG only
+
+  * `talos.cpg_internal.input_tsv_from_metamist` builds input TSV rows for Metamist cohorts, generating each cohort's pedigree, external ID map, seqr map and merged config. It needs the new `cpg` extra (`metamist`)
+  * `cpg_main.nf`, a second entrypoint over `TALOS_PIPELINE`. It takes Metamist cohort IDs (`--cohort_ids`, `--access_level`, `--sequencing_type`, `--talos_config`) instead of an input TSV, builds the cohort rows with `InputTsvFromMetamist`, and publishes each cohort to `gs://cpg-<dataset>-{main|test}/<sequencing_type>/talos/<cohort>/{annotated,analysis_YYYYMMDD}/`. See `docs/CpgDeployment.md`
+  * `cpg_main.nf --metamist` registers each cohort's published results JSON (`aip-results`, the next run's history) and HTML report (`aip-report`) in Metamist, against the Metamist cohort. Off by default
+
+## Changed
+
+  * Outputs are published with process `publishDir` instead of workflow outputs (the `output {}` block), so each cohort can be given its own output location. The entrypoint decides each cohort's annotated and analysis directories and passes them down to the processes that publish. The output layout is unchanged
+  * `main.nf` takes its output root from the required `--outdir` param. `-output-dir` / `outputDir` is no longer read
+  * `preparation.nf` publishes each newly generated resource directly to `params.processed_annotations`, and no longer needs an output directory
+  * The annotation → SV annotation → analysis wiring moved out of `main.nf` into a shared `TALOS_PIPELINE` workflow (`nextflow/talos_pipeline.nf`), which takes one row per cohort with its output directories. `main.nf` now only validates params, builds those rows from the input TSV, and writes the next-cycle TSV. Process names gain a `TALOS_PIPELINE:` prefix, so `-resume` won't reuse tasks cached by earlier runs
+  * SV annotation is decided per input TSV row instead of by whether the TSV has an `sv` column. The SV reference data (`svafotate_bed`, `mane_gtf`, `svannotate_noncoding_bed`) is now required for every run
+  * Some TOML config sections renamed from their Hail versions (e.g. RunHailFiltering -> RunSmallFiltering)
+
+## Fixed
+
+  * Single-sample VCF inputs (`ss_vcf_dir`) are now split and left-aligned per sample before merging, instead of after (#729). When an allele was part of a multi-allelic record in one sample but a separate record in another, the merge split it across two rows, each with only some samples' genotypes. That produced false de novo calls and dropped alleles. Cohorts annotated from `ss_vcf_dir` before this fix keep the bad rows until their `${cohort}_annotated/` directory is deleted and they are re-annotated. A variant written twice within one sample's VCF is now also deduplicated
+  * The default `errorStrategy` in `nextflow.config` read `process.maxRetries`, which is undefined when the closure runs. Every task failure threw instead of retrying. It now reads `task.maxRetries`, so failed tasks are retried up to 3 times with backoff
+
+## Removed
+
+  * `params.annotated_dir`. Annotation products are always read from, and written to, `<outdir>/<cohort>_annotated`
+  * The startup check comparing the output directory with `params.processed_annotations`
+  * `workflow.output.mode` and `outputDir` from `nextflow.config`
+
 [0.6.0] - 2026-10
 
 ## Added

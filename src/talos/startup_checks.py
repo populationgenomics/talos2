@@ -24,8 +24,8 @@ CONFIG_ERRORS: list[str] = []
 
 # INFO fields every annotated shard must declare, mapped to the process which should have written them
 REQUIRED_INFO_FIELDS: dict[str, str] = {
-    'AC': 'bcftools +fill-tags, in NormaliseVcf',
-    'AN': 'bcftools +fill-tags, in NormaliseVcf',
+    'AC': 'bcftools +fill-tags in NormaliseVcf, or the input VCF if params.recalculate_ac_af_an is false',
+    'AN': 'bcftools +fill-tags in NormaliseVcf, or the input VCF if params.recalculate_ac_af_an is false',
     'BCSQ': 'bcftools csq, in AnnotateShard',
     # **dict.fromkeys(GNOMAD_SOURCE_FIELDS, 'the gnomAD echtvar zip, in AnnotateShard'),
 }

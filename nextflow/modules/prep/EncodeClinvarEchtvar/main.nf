@@ -1,5 +1,6 @@
 process EncodeClinvarEchtvar {
     container params.container
+    publishDir params.processed_annotations, mode: 'copy'
 
     // encode the ClinvArbitration release VCF (all decisions, not just Pathogenic SNVs) into an
     // echtvar zip. The config renames the source INFO fields to the clinvar_* names the streaming
