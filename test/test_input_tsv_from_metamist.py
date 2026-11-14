@@ -52,6 +52,14 @@ def test_parse_cohorts():
     assert beta.sgs[0].hpo_terms == ()
 
 
+def test_parse_cohorts_dataset_from_project_name():
+    # Metamist reports some test projects' dataset with the -test suffix; it must not leak into bucket paths
+    response = copy.deepcopy(COHORTS)
+    response[0]['project']['dataset'] = 'alpha-test'
+    (alpha,) = _cohorts('COH0001', response=response)
+    assert alpha.dataset == 'alpha'
+
+
 def test_parse_cohorts_keeps_requested_order():
     assert [cohort.id for cohort in _cohorts('COH0002', 'COH0001')] == ['COH0002', 'COH0001']
 
@@ -350,7 +358,7 @@ def test_write_cohort_inputs(tmp_path):
     assert row == {
         'cohort': 'COH0001',
         'path': 'gs://cpg-alpha-test/alpha.vcf.bgz',
-        'type': 'dataset_vcf',
+        'type': 'vcf',
         'pedigree': f'{tmp_path}/COH0001_pedigree.ped',
         'config': f'{tmp_path}/COH0001_config.toml',
         'history': 'gs://cpg-alpha-test/history.json',

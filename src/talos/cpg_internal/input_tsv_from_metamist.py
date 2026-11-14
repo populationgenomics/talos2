@@ -99,7 +99,6 @@ query TalosCohorts($ids: [String!]!) {
         name
         project {
             name
-            dataset
             meta
         }
         sequencingGroups(activeOnly: {eq: true}) {
@@ -282,7 +281,8 @@ def parse_cohorts(
         cohorts.append(
             Cohort(
                 id=cohort_id,
-                dataset=raw['project']['dataset'],
+                # from the project name, not Metamist's `dataset` field, which carries `-test` for some test projects
+                dataset=project.removesuffix('-test'),
                 project=project,
                 project_meta=raw['project']['meta'] or {},
                 sgs=tuple(sgs),
