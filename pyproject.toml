@@ -141,8 +141,8 @@ replace = 'version="{new_version}"'
 
 [[tool.bumpversion.files]]
 filename = "Dockerfile"
-search = "{current_version}"
-replace = "{new_version}"
+search = "VERSION={current_version}"
+replace = "VERSION={new_version}"
 
 [[tool.bumpversion.files]]
 filename = "nextflow.config"
