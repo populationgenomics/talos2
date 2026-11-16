@@ -11,19 +11,18 @@ jobs:
   test:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+    - uses: actions/checkout@v6
 
+    - uses: astral-sh/setup-uv@v7
+      with:
+        python-version: '3.12'
+        enable-cache: true
+
+    # --locked fails the job if uv.lock is out of date with pyproject.toml
     - name: Install packages
-      run: |
-        pip install ".[test]"
+      run: uv sync --locked --extra test
 
     - name: test
-      run: pytest -n auto .
+      run: uv run --no-sync pytest -n auto .
